@@ -1,0 +1,53 @@
+{
+  "status": "completed",
+  "receipt": {
+    "id": "52bb9516-bb44-47c6-814b-f4c72569fca3",
+    "purchaseId": "3c3a0bcf-cfb6-4df0-b3b0-cd8f56925f7d",
+    "quoteId": "3c3a0bcf-cfb6-4df0-b3b0-cd8f56925f7d",
+    "network": {
+      "name": "Stable Testnet",
+      "chainId": 2201,
+      "explorerBaseUrl": "https://testnet.stablescan.xyz"
+    },
+    "asset": {
+      "id": "stable-testnet:native",
+      "symbol": "USDT0",
+      "kind": "native",
+      "address": null,
+      "decimals": 18
+    },
+    "payer": "0x0b1869b29c8222cb13137adac614b78355bbc3a5",
+    "payee": "0x386eE444ee58E1366E02E6361b67E970B514Ca64",
+    "pricePaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "10000000000000000"
+    },
+    "networkFeePaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "222800000000000"
+    },
+    "totalPaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "10222800000000000"
+    },
+    "txHash": "0xffcb0db26213ea362df90a8e0b66f487c8962a644feb2dc8a472b67288b250d7",
+    "explorerUrl": "https://testnet.stablescan.xyz/tx/0xffcb0db26213ea362df90a8e0b66f487c8962a644feb2dc8a472b67288b250d7",
+    "settledAt": "2026-09-29T15:29:12.000Z"
+  },
+  "result": {
+    "type": "invoice-extraction",
+    "sampleId": "sample-invoice-01",
+    "vendor": "Example Studio",
+    "invoiceNumber": "DEMO-001",
+    "currency": "USD",
+    "lineItems": [
+      {
+        "description": "Design review",
+        "quantity": "2",
+        "unitPrice": "25.00",
+        "total": "50.00"
+      }
+    ],
+    "total": "50.00"
+  }
+}

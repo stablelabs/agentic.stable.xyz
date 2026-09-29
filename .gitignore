@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*.local
+data/
+test-results/
+playwright-report/
+public/docs/*/index.html
+*.log
+.buyer-state/
+evidence/screenshots/native-zoom-200.png

@@ -1,0 +1,150 @@
+{
+  "checkedAt": "2026-09-29T15:30:22.210Z",
+  "run": {
+    "id": "89efa074-bf00-4b4b-96f0-33226ee7cf97",
+    "purchaseId": "28252d3b-cd73-495e-8c48-28bf8efa6a07",
+    "quoteId": "28252d3b-cd73-495e-8c48-28bf8efa6a07",
+    "status": "completed",
+    "events": [
+      {
+        "seq": 1,
+        "at": "2026-09-29T15:30:10.285Z",
+        "status": "queued",
+        "message": "Purchase queued."
+      },
+      {
+        "seq": 2,
+        "at": "2026-09-29T15:30:11.165Z",
+        "status": "authorizing",
+        "message": "Checking purchase permissions."
+      },
+      {
+        "seq": 3,
+        "at": "2026-09-29T15:30:14.815Z",
+        "status": "submitted",
+        "message": "Payment submitted."
+      },
+      {
+        "seq": 4,
+        "at": "2026-09-29T15:30:14.816Z",
+        "status": "confirming",
+        "message": "Waiting for settlement confirmation."
+      },
+      {
+        "seq": 5,
+        "at": "2026-09-29T15:30:18.506Z",
+        "status": "settled",
+        "message": "Payment settled and verified."
+      },
+      {
+        "seq": 6,
+        "at": "2026-09-29T15:30:18.506Z",
+        "status": "delivering",
+        "message": "Retrieving the invoice extraction result."
+      },
+      {
+        "seq": 7,
+        "at": "2026-09-29T15:30:18.507Z",
+        "status": "completed",
+        "message": "Invoice extraction delivered."
+      }
+    ],
+    "txHash": "0xa03d67caf59df1e4939c2533b9c781ec91df69b4442468f23e76eb0eb133a5b8",
+    "receipt": {
+      "id": "75439228-5188-4c0e-8029-e3b4ca2470dd",
+      "purchaseId": "28252d3b-cd73-495e-8c48-28bf8efa6a07",
+      "quoteId": "28252d3b-cd73-495e-8c48-28bf8efa6a07",
+      "network": {
+        "name": "Stable Testnet",
+        "chainId": 2201,
+        "explorerBaseUrl": "https://testnet.stablescan.xyz"
+      },
+      "asset": {
+        "id": "stable-testnet:native",
+        "symbol": "USDT0",
+        "kind": "native",
+        "address": null,
+        "decimals": 18
+      },
+      "payer": "0x350b2F1a99fb1731D5B719c323893EecC9A2F6F2",
+      "payee": "0x386eE444ee58E1366E02E6361b67E970B514Ca64",
+      "pricePaid": {
+        "assetId": "stable-testnet:native",
+        "amountAtomic": "10000000000000000"
+      },
+      "networkFeePaid": {
+        "assetId": "stable-testnet:native",
+        "amountAtomic": "222800000000000"
+      },
+      "totalPaid": {
+        "assetId": "stable-testnet:native",
+        "amountAtomic": "10222800000000000"
+      },
+      "txHash": "0xa03d67caf59df1e4939c2533b9c781ec91df69b4442468f23e76eb0eb133a5b8",
+      "explorerUrl": "https://testnet.stablescan.xyz/tx/0xa03d67caf59df1e4939c2533b9c781ec91df69b4442468f23e76eb0eb133a5b8",
+      "settledAt": "2026-09-29T15:30:14.000Z"
+    },
+    "result": {
+      "type": "invoice-extraction",
+      "sampleId": "sample-invoice-01",
+      "vendor": "Example Studio",
+      "invoiceNumber": "DEMO-001",
+      "currency": "USD",
+      "lineItems": [
+        {
+          "description": "Design review",
+          "quantity": "2",
+          "unitPrice": "25.00",
+          "total": "50.00"
+        }
+      ],
+      "total": "50.00"
+    },
+    "error": null,
+    "session": {
+      "id": "67eaa345-9d45-4d3b-9d6f-b4b2172c9c3a",
+      "mode": "testnet",
+      "status": "ready",
+      "expiresAt": "2026-09-29T16:00:00.547Z",
+      "network": {
+        "name": "Stable Testnet",
+        "chainId": 2201,
+        "explorerBaseUrl": "https://testnet.stablescan.xyz"
+      },
+      "asset": {
+        "id": "stable-testnet:native",
+        "symbol": "USDT0",
+        "kind": "native",
+        "address": null,
+        "decimals": 18
+      },
+      "walletAddress": "0x350b2F1a99fb1731D5B719c323893EecC9A2F6F2",
+      "balance": {
+        "assetId": "stable-testnet:native",
+        "amountAtomic": "989777200000000000"
+      },
+      "budget": {
+        "limit": {
+          "assetId": "stable-testnet:native",
+          "amountAtomic": "50000000000000000"
+        },
+        "spent": {
+          "assetId": "stable-testnet:native",
+          "amountAtomic": "10222800000000000"
+        },
+        "reserved": {
+          "assetId": "stable-testnet:native",
+          "amountAtomic": "0"
+        },
+        "remaining": {
+          "assetId": "stable-testnet:native",
+          "amountAtomic": "39777200000000000"
+        }
+      },
+      "activeRunId": "89efa074-bf00-4b4b-96f0-33226ee7cf97"
+    }
+  },
+  "runMutations": 1,
+  "downloadedJsonMatches": true,
+  "recoveredAfterReload": true
+}

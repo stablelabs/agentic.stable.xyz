@@ -1,0 +1,3 @@
+agentic.stable.xyz {
+  reverse_proxy site:8787
+}
