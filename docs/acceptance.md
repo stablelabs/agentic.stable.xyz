@@ -55,6 +55,8 @@ Secrets were moved from the edited example template into ignored, mode-600 .env 
 
 ## Outstanding release gates
 
+Cloudflare deployment preparation on 2026-09-29 added a shared SQL ledger and a SQLite-backed Durable Object adapter. The local Cloudflare runtime served the API, and evidence/cloudflare-local.json records passing fake-chain transaction, duplicate-payment, recovery, and full-runtime-restart persistence checks. This is not hosted live-payment evidence. The logged-in Cloudflare OAuth token lacks account and route permissions; browser authorization timed out. No Worker, DNS change, or wallet-secret upload has been published.
+
 W12 still requires a clean-source full-stack live run in the release environment; the independent clean Node 22 image build and backend suite passed earlier, and live flows passed from this working tree, but these are separate evidence. Do not claim they prove the combined clean-checkout live gate.
 
 The owner supplied https://github.com/stablelabs/agentic.stable.xyz, verified as an empty private repository before the initial publication. Its visibility has not been changed. Public source access requires a separate owner decision.

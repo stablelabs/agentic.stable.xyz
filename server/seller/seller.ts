@@ -11,7 +11,7 @@ import {
 import { digest } from '../crypto';
 import { AppError, requireThat } from '../errors';
 import type { Config } from '../config';
-import type { Store } from '../store';
+import type { Ledger } from '../ledger';
 import type { PaymentChain } from '../payments/chain';
 import { extractInvoice } from './service';
 
@@ -24,7 +24,7 @@ export type Order = {
 };
 export class Seller {
   constructor(
-    public store: Store,
+    public store: Ledger,
     public chain: PaymentChain,
     public config: Config,
   ) {}

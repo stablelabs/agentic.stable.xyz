@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.env
 .env.*.local
 data/
 test-results/
@@ -9,3 +8,11 @@ public/docs/*/index.html
 *.log
 .buyer-state/
 evidence/screenshots/native-zoom-200.png
+
+.projects/*
+!.projects/state.json
+.env
+.wrangler/
+.dev.vars
+.dev.vars.*
+worker-configuration.d.ts

@@ -1,5 +1,7 @@
 # Deployment
 
+For the requested Cloudflare deployment, use the [Cloudflare guide](/docs/cloudflare/). Its durable storage adapter is locally verified; account authorization and hosted verification are still pending. The Node/Docker deployment below remains supported.
+
 Run the API and built frontend together as one Node 22 process, backed by a durable local volume. The supplied Dockerfile and Compose configuration preserve SQLite state. This is not a static-only deployment.
 
 ```sh

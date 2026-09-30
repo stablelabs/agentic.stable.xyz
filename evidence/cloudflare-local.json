@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-09-30T08:23:08.236Z",
+  "rollback": true,
+  "idempotency": true,
+  "concurrentExclusion": true,
+  "unknownRecovery": true,
+  "actualFeeAccounting": true,
+  "deliveryRetryWithoutRepayment": true,
+  "oneTimePaymentEvidence": true,
+  "fixtureOnly": true,
+  "persistedAfterRestart": true
+}

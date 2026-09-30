@@ -9,7 +9,15 @@ import { inputSchema } from '../shared/contracts';
 import type { Engine } from './engine';
 import { AppError, requireThat } from './errors';
 import { sellerRoutes } from './seller/routes';
-export function createApp(engine: Engine, standalone = false) {
+export function createApp(
+  engine: Engine,
+  standalone = false,
+  options: {
+    apiOnly?: boolean;
+    clientIp?: (req: express.Request) => string;
+    onWork?: () => Promise<void>;
+  } = {},
+) {
   const app = express();
   app.disable('x-powered-by');
   app.use(compression());
@@ -32,7 +40,8 @@ export function createApp(engine: Engine, standalone = false) {
   app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     res.locals.requestId = randomUUID();
-    engine.store.rate(`api:${req.ip}`, 300, 60_000);
+    res.locals.clientIp = options.clientIp?.(req) || req.ip || 'unknown';
+    engine.store.rate(`api:${res.locals.clientIp}`, 300, 60_000);
     if (req.method !== 'GET') {
       requireThat(req.is('application/json'), 'INVALID_REQUEST', 'JSON request required.', 400);
       if (req.path.startsWith('/agentic/') || req.headers.origin)
@@ -85,9 +94,10 @@ export function createApp(engine: Engine, standalone = false) {
       }
       if (!id) {
         await engine.readiness();
-        id = engine.createSession(requestKey, req.ip || 'unknown');
+        id = engine.createSession(requestKey, res.locals.clientIp);
       }
       engine.authenticate(engine.cookie(id));
+      await options.onWork?.();
       const expires = engine.session(id).expiresAt;
       res.cookie('agentic_session', engine.cookie(id), {
         httpOnly: true,
@@ -108,36 +118,42 @@ export function createApp(engine: Engine, standalone = false) {
       engine.store.rate(`quotes:${res.locals.sessionId}`, 30);
       res.status(201).json(engine.quote(res.locals.sessionId));
     });
-    app.post(`${prefix}/runs`, (req, res) => {
+    app.post(`${prefix}/runs`, async (req, res) => {
       const { quoteId } = z.object({ quoteId: z.string().uuid() }).strict().parse(req.body);
-      res.status(202).json(engine.start(res.locals.sessionId, quoteId, key(req)));
+      const run = engine.start(res.locals.sessionId, quoteId, key(req));
+      await options.onWork?.();
+      res.status(202).json(run);
     });
     app.get(`${prefix}/runs/:id`, (req, res) =>
       res.json(engine.run(String(req.params.id), res.locals.sessionId)),
     );
-    app.post(`${prefix}/runs/:id/resume`, (req, res) => {
+    app.post(`${prefix}/runs/:id/resume`, async (req, res) => {
       z.object({}).strict().parse(req.body);
-      res.status(202).json(engine.resume(String(req.params.id), res.locals.sessionId, key(req)));
+      const run = engine.resume(String(req.params.id), res.locals.sessionId, key(req));
+      await options.onWork?.();
+      res.status(202).json(run);
     });
     app.get(['/docs/source', '/docs/source/'], (_req, res, next) => {
       if (engine.config.repository) res.redirect(302, engine.config.repository);
       else next();
     });
-    app.use('/docs', express.static(resolve('dist/docs')));
-    app.use(express.static(resolve('dist'), { index: false }));
-    app.get('/', (_req, res, next) => {
-      try {
-        let html = readFileSync(resolve('dist/index.html'), 'utf8');
-        if (engine.config.origin === 'https://agentic.stable.xyz')
-          html = html.replace(
-            '<meta name="robots" content="noindex,nofollow" />',
-            '<link rel="canonical" href="https://agentic.stable.xyz" />',
-          );
-        res.type('html').send(html);
-      } catch {
-        next();
-      }
-    });
+    if (!options.apiOnly) {
+      app.use('/docs', express.static(resolve('dist/docs')));
+      app.use(express.static(resolve('dist'), { index: false }));
+      app.get('/', (_req, res, next) => {
+        try {
+          let html = readFileSync(resolve('dist/index.html'), 'utf8');
+          if (engine.config.origin === 'https://agentic.stable.xyz')
+            html = html.replace(
+              '<meta name="robots" content="noindex,nofollow" />',
+              '<link rel="canonical" href="https://agentic.stable.xyz" />',
+            );
+          res.type('html').send(html);
+        } catch {
+          next();
+        }
+      });
+    }
   }
   app.use('/api', (_req, res) =>
     res.status(404).json({

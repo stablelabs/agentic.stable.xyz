@@ -18,6 +18,7 @@ The GitHub repository is currently private; cloning requires repository access. 
 - [Agent setup](docs/agent-setup.md)
 - [Accept payments](docs/accept-payments.md)
 - [Deployment](docs/deployment.md)
+- [Cloudflare deployment](docs/cloudflare.md)
 - [Acceptance evidence and blockers](docs/acceptance.md)
 - [Product requirements](prd.md)
 

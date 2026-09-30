@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "agentic-stable",
+  "main": "cloudflare/worker.ts",
+  "compatibility_date": "2026-09-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": true },
+  "durable_objects": {
+    "bindings": [{ "name": "FUNDING_LEDGER", "class_name": "FundingLedger" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FundingLedger"] }],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://agentic.stable.xyz",
+    "NODE_ENV": "production",
+    "PAYMENTS_ENABLED": "false",
+    "STABLE_RPC_URL": "https://rpc.testnet.stable.xyz",
+    "SESSION_FUND_USDT0": "1",
+    "SESSION_BUDGET_USDT0": "0.05",
+    "PRICE_USDT0": "0.01",
+    "MAX_FEE_USDT0": "0.01",
+    "GLOBAL_FUNDING_CAP_USDT0": "7",
+    "SESSION_RATE_PER_HOUR": "3",
+    "REPOSITORY_URL": "https://github.com/stablelabs/agentic.stable.xyz",
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

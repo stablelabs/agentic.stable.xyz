@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { configFromEnv } from './config';
 import { Store } from './store';
 import { StableChain } from './payments/chain';

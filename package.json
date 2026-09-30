@@ -18,7 +18,11 @@
     "test": "vitest run",
     "test:browser": "playwright test",
     "test:live": "node --import tsx scripts/live-smoke.ts",
-    "test:live:browser": "node --import tsx scripts/live-browser.ts"
+    "test:live:browser": "node --import tsx scripts/live-browser.ts",
+    "cloudflare:types": "wrangler types",
+    "cloudflare:check": "tsc --noEmit -p tsconfig.cloudflare.json",
+    "test:cloudflare": "node scripts/test-cloudflare.mjs",
+    "deploy:cloudflare": "npm run build && npm run cloudflare:types && npm run cloudflare:check && wrangler deploy"
   },
   "dependencies": {
     "@stablechain/sdk": "1.0.8",
@@ -45,9 +49,12 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
     "concurrently": "^9.1.0",
+    "esbuild": "^0.28.1",
+    "miniflare": "^5.20260926.1-alpha",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vite": "^6.3.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "wrangler": "^4.143.1"
   }
 }

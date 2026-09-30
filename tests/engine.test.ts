@@ -144,6 +144,20 @@ describe('durable purchase accounting', () => {
     expect(result.session.budget.spent.amountAtomic).toBe('1000');
     expect(result.session.budget.reserved.amountAtomic).toBe('0');
   });
+  it('does not broadcast before signed state is durable', async () => {
+    const { engine, chain, store } = setup();
+    const id = await ready(engine);
+    const run = engine.start(id, engine.quote(id).id, randomUUID());
+    const fundingBroadcasts = chain.broadcasts.length;
+    vi.spyOn(store, 'flush').mockRejectedValueOnce(new Error('durability unavailable'));
+    await engine.tick();
+    expect(chain.broadcasts).toHaveLength(fundingBroadcasts);
+    expect(engine.run(run.id, id).status).toBe('payment_unknown');
+    await engine.tick();
+    expect(engine.run(run.id, id).status).toBe('completed');
+    expect(chain.prepared).toHaveLength(2);
+    expect(chain.broadcasts).toHaveLength(fundingBroadcasts + 1);
+  });
   it('retries paid delivery without another payment and preserves the receipt', async () => {
     const { engine, chain } = setup();
     const id = await ready(engine);

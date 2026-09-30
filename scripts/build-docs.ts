@@ -6,6 +6,7 @@ const pages = [
   'accept-payments',
   'source',
   'deployment',
+  'cloudflare',
   'acceptance',
 ];
 for (const name of pages) {

@@ -14,7 +14,7 @@ import {
 import { decrypt, digest, encrypt } from './crypto';
 import { AppError, requireThat } from './errors';
 import type { Config } from './config';
-import type { Store } from './store';
+import type { Ledger } from './ledger';
 import { binding, type PaymentChain, type Prepared } from './payments/chain';
 import { Seller } from './seller/seller';
 
@@ -37,7 +37,7 @@ export class Engine {
   private working = false;
   private ready = false;
   constructor(
-    public store: Store,
+    public store: Ledger,
     public chain: PaymentChain,
     public config: Config,
   ) {
@@ -341,6 +341,7 @@ export class Engine {
       if (!r.view.receipt) {
         let settlement = await this.chain.settlement(r.prepared.hash, q);
         if (!settlement) {
+          await this.store.flush();
           await this.chain.broadcast(r.prepared.raw);
           this.event(r, 'submitted', 'Payment submitted.');
           this.event(r, 'confirming', 'Waiting for settlement confirmation.');
@@ -432,6 +433,7 @@ export class Engine {
       }
       let settled = await this.chain.settlement(s.funding.hash, s.fundingQuote!);
       if (!settled) {
+        await this.store.flush();
         await this.chain.broadcast(s.funding.raw);
         settled = await this.chain.settlement(s.funding.hash, s.fundingQuote!);
       }
