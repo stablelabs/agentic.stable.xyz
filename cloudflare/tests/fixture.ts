@@ -1,9 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
+import { handleAsNodeRequest } from 'cloudflare:node';
+import { createServer } from 'node:http';
 import assert from 'node:assert/strict';
 import { DurableLedger } from '../store';
 import { Engine } from '../../server/engine';
 import { configFromEnv } from '../../server/config';
 import { FakeChain } from '../../tests/fake-chain';
+import { createApp } from '../../server/app';
 
 // Only the local test harness bundles this module. It is not a deployment entry point.
 export class TestLedger extends DurableObject {
@@ -65,6 +68,28 @@ export class TestLedger extends DurableObject {
     await restarted.tick();
     assert.equal(chain.prepared.length, 2);
     assert.throws(() => store.consume(result.txHash!, crypto.randomUUID()), /another order/);
+    const server = createServer(createApp(restarted, false, { apiOnly: true }));
+    server.listen(0);
+    try {
+      const address = server.address();
+      assert.ok(address && typeof address !== 'string');
+      const response = await handleAsNodeRequest(
+        address.port,
+        new Request(`https://test/api/agentic/v1/runs/${run.id}`, {
+          headers: {
+            Cookie: `agentic_session=${restarted.cookie(id)}`,
+            'Accept-Encoding': 'br, gzip',
+          },
+        }),
+      );
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-encoding'), null);
+      const body = await response.text();
+      assert.ok(body.length > 1024, 'Exercise the Express compression threshold.');
+      assert.equal(JSON.parse(body).status, 'completed');
+    } finally {
+      server.close();
+    }
     store.put('test', 'completed', { runId: run.id, sessionId: id });
     await store.flush();
     return Response.json({
@@ -75,6 +100,7 @@ export class TestLedger extends DurableObject {
       actualFeeAccounting: true,
       deliveryRetryWithoutRepayment: true,
       oneTimePaymentEvidence: true,
+      httpBridgeEncoding: true,
       fixtureOnly: true,
     });
   }

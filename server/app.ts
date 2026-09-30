@@ -20,7 +20,8 @@ export function createApp(
 ) {
   const app = express();
   app.disable('x-powered-by');
-  app.use(compression());
+  // The Worker edge handles compression after the Node HTTP response bridge.
+  if (!options.apiOnly) app.use(compression());
   app.use(
     helmet({
       contentSecurityPolicy: {

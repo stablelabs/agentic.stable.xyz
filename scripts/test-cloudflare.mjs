@@ -10,7 +10,10 @@ const bundled = await build({
   bundle: true,
   write: false,
   format: 'esm',
-  platform: 'neutral',
+  platform: 'node',
+  banner: {
+    js: 'import { createRequire } from "node:module"; const require = createRequire("/");',
+  },
   conditions: ['workerd', 'worker', 'import'],
   external: ['node:*', 'cloudflare:*'],
   target: 'es2022',

@@ -1,6 +1,6 @@
 # Acceptance record
 
-Local implementation is built and tested. Live API, browser, standalone seller/buyer, and coding-agent purchases passed on 2026-09-29. Publication and fresh-checkout live release acceptance remain outstanding. This is not a public-release certification.
+Local implementation is built and tested. Live API, browser, standalone seller/buyer, and coding-agent purchases passed on 2026-09-29. Cloudflare publication and a hosted browser purchase passed on 2026-09-30. Fresh-checkout live release acceptance remains outstanding. This is not a full public-release certification.
 
 ## Confirmed network metadata
 
@@ -8,11 +8,11 @@ Read-only check on 2026-09-28 verified Stable Testnet chain 2201 at block 707250
 
 ## Automated checks
 
-28 backend tests pass: session reuse, explicit purchase authorization, idempotency conflicts, cumulative budgets, concurrent-run exclusion, one-time quote consumption, quote expiry/change, insufficient balance, unknown-payment recovery, reverted-payment fees, delivery retry, session expiry/isolation, one-time payment evidence, funding caps/rates, encryption, and source validation. Additional tests verify transaction chain/payer/payee/value/input, confirmation depth, canonical blocks, signed challenges, cookie restrictions, mutation origins, and database process ownership. These use an explicitly fake chain and are not live-testnet evidence.
+29 backend tests pass: session reuse, explicit purchase authorization, idempotency conflicts, cumulative budgets, concurrent-run exclusion, one-time quote consumption, quote expiry/change, insufficient balance, unknown-payment recovery, reverted-payment fees, delivery retry, session expiry/isolation, one-time payment evidence, funding caps/rates, encryption, and source validation. Additional tests verify transaction chain/payer/payee/value/input, confirmation depth, canonical blocks, signed challenges, cookie restrictions, mutation origins, database process ownership, and signed-state durability before broadcast. These use an explicitly fake chain and are not live-testnet evidence.
 
 24 Playwright checks pass, covering all run statuses, explicit authorization, lost-response idempotency, JSON download, analytics deduplication, close/reopen recovery, quote expiry, funding, rate-limit timing, budget/balance rejection, keyboard focus return, no-JavaScript content, guides, and responsive layouts. Viewports include 1440x900, 390px, 320px, and 720x450. Native Chrome zoom was separately verified at 200%: the landing page remained legible and the dialog scrolled to its lower controls while retaining its close button. Zoom was restored to 100% afterward. Tested accessibility scans found no serious or critical axe violations.
 
-Type checking and production build pass. An independent Docker build installed from the lockfile on Linux/Node 22, built the full project, and passed the 28 backend tests. A temporary production-mode container served the root and guides with payments explicitly disabled. The production origin emitted the correct canonical link; the local/staging origin remains noindexed. Compose configuration validates. No deployment was published.
+Type checking and production build pass. An independent Docker build installed from the lockfile on Linux/Node 22, built the full project, and passed the then-current 28 backend tests. A temporary production-mode container served the root and guides with payments explicitly disabled. The production origin emitted the correct canonical link; the local/staging origin remains noindexed. Compose configuration validates. The later Cloudflare publication is recorded below.
 
 A Lighthouse 12.8.2 mobile simulation against the built local server measured performance 100, accessibility 100, and best practices 100, with FCP 1.3 seconds, LCP 1.7 seconds, and CLS 0. SEO scored 63 solely because staging is deliberately noindexed. These are one-run local measurements, not guarantees for a deployed service or every device.
 
@@ -55,10 +55,14 @@ Secrets were moved from the edited example template into ignored, mode-600 .env 
 
 ## Outstanding release gates
 
-Cloudflare deployment preparation on 2026-09-29 added a shared SQL ledger and a SQLite-backed Durable Object adapter. The local Cloudflare runtime served the API, and evidence/cloudflare-local.json records passing fake-chain transaction, duplicate-payment, recovery, and full-runtime-restart persistence checks. This is not hosted live-payment evidence. The logged-in Cloudflare OAuth token lacks account and route permissions; browser authorization timed out. No Worker, DNS change, or wallet-secret upload has been published.
+Cloudflare deployment on 2026-09-30 uses a shared SQL ledger and a SQLite-backed Durable Object at https://agentic-stable.angela-f4b.workers.dev. Existing credentials worked with an explicit, browser-verified account ID. The owner approved uploading the three required Worker secrets and activating capped testnet payments. Local funding was stopped, local payments disabled, and all local funding receipts reconciled; the hosted cap is 5.96 test USDT0 after 4.04 already reserved locally. No DNS changes were made.
+
+The hosted browser purchase delivered the invoice and recovered the same transaction after reload: https://testnet.stablescan.xyz/tx/0xc410c6184e8c9f7268bd1eaa2ee023d20838f08f5cb32611ef550853d7ffe854. Independent RPC checks verified chain 2201, successful canonical receipt, seller, 0.01 value, and 0.0002228 actual fee; the explorer returned 200. The browser showed 0.0397772 remaining and zero reserved from its 0.05 budget. Evidence is in evidence/cloudflare-hosted.json and evidence/cloudflare-hosted-result.png.
+
+The first hosted API smoke attempt exposed a large-JSON response encoding problem and did not pass. Express compression is now disabled in Worker API mode so Cloudflare owns encoding. The local runtime regression covers large completed JSON through the actual HTTP bridge, along with fake-chain transactions, idempotency, recovery, and full-runtime-restart persistence. The later hosted browser purchase passed with the fix. There are now 29 passing backend tests, including the signed-state durability boundary.
 
 W12 still requires a clean-source full-stack live run in the release environment; the independent clean Node 22 image build and backend suite passed earlier, and live flows passed from this working tree, but these are separate evidence. Do not claim they prove the combined clean-checkout live gate.
 
 The owner supplied https://github.com/stablelabs/agentic.stable.xyz, verified as an empty private repository before the initial publication. Its visibility has not been changed. Public source access requires a separate owner decision.
 
-The live domain, hosting provider configuration, and DNS mapping remain unverified. Stripe Projects reports no initialized project in this folder. Funding and local live-flow verification are no longer blockers; hosting/domain access and release-environment verification remain.
+The workers.dev deployment and hosted browser payment flow are verified. Custom-domain DNS mapping, a full post-fix hosted API smoke run, and clean-source live release acceptance remain outstanding. Stripe Projects reports no initialized project and no deployable Cloudflare catalog service; deployment used Wrangler with the existing login.

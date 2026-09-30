@@ -1,6 +1,10 @@
 # Cloudflare deployment
 
-Status: the Worker and SQLite-backed Durable Object adapter are implemented and locally tested. No Cloudflare deployment or DNS change has been made yet. The existing login lacks required permissions; its OAuth refresh timed out awaiting browser approval.
+Status: deployed on 2026-09-30 at https://agentic-stable.angela-f4b.workers.dev in the owner's existing Cloudflare account. The SQLite-backed Durable Object, assets, testnet funding, settlement, and invoice delivery are live. A browser purchase and reload recovery passed. No custom-domain DNS change was made.
+
+The existing Wrangler login successfully deployed when the browser-verified account ID was supplied explicitly; broader OAuth authorization was not required. Only FUNDING_PRIVATE_KEY, SESSION_ENCRYPTION_KEY, and SELLER_ADDRESS were uploaded as Worker secrets. BUYER_PRIVATE_KEY remains local.
+
+At signer cutover, the local server was stopped and local `.env` payments were disabled. All four local funding transactions were independently verified as settled. The local ledger had reserved 4.04 test USDT0, so the hosted lifetime funding cap is 5.96, preserving the original combined cap of 10. Never increase or reset either allowance without operator approval and reconciliation. This is a small, exhaustible demo allowance, not unlimited public funding.
 
 ## Runtime
 
@@ -34,14 +38,16 @@ This prevents Wrangler from loading the funded Node `.env` during local runtime 
 
 ## Release sequence
 
-1. Refresh the logged-in account with `npx wrangler login` and approve Cloudflare's consent page. Verify the intended account with `npx wrangler whoami`.
+1. Verify the logged-in account with `npx wrangler whoami` and the dashboard. This deployment pins the verified account ID in wrangler.jsonc; do not request broader OAuth scopes merely because account listing is unavailable.
 2. Inspect account and stable.xyz zone access. Do not overwrite an existing agentic.stable.xyz DNS record or route without checking its owner.
 3. Deploy the Worker with payments disabled using `npm run deploy:cloudflare`. Verify static content, guides, API errors, and persistence before adding secrets.
-4. Stop local use of the funding signer and reconcile every pending local transaction. Migrate accounting or reconcile the hosted funding cap against the amount already allocated locally. The provisional hosted cap of 7 test USDT0 must be rechecked; it is not permission to reset a spent cap.
+4. Stop local use of the funding signer and reconcile every pending local transaction. Migrate accounting or reconcile the hosted funding cap against the amount already allocated locally. The current 5.96 cap is already net of 4.04 allocated locally; it is not permission to reset a spent cap.
 5. Store only FUNDING_PRIVATE_KEY, SESSION_ENCRYPTION_KEY and SELLER_ADDRESS using Wrangler secret commands or its secure bulk input. Never upload BUYER_PRIVATE_KEY. Never pass secrets as command arguments or commit them. Secret changes and funding signers require operator-controlled cutover.
-6. Configure the verified public origin and custom domain, enable payments, then repeat live browser/API/standalone acceptance from the deployed source. Keep the same object identity through every deployment.
+6. Configure the verified public origin, enable payments only after operator approval, then repeat live browser/API/standalone acceptance from the deployed source. The current origin is the workers.dev URL. A future custom-domain cutover requires checking zone ownership and changing PUBLIC_ORIGIN together. Keep the same object identity through every deployment.
 
-Production configuration begins with payments disabled. Do not claim this is a working hosted purchase flow until the hosted live tests pass. The source repository remains private.
+The initial deployment had payments disabled; the owner subsequently approved activation. The hosted browser purchase delivered invoice DEMO-001 and recovered the same receipt after reload: https://testnet.stablescan.xyz/tx/0xc410c6184e8c9f7268bd1eaa2ee023d20838f08f5cb32611ef550853d7ffe854. Service price was 0.01 and actual fee was 0.0002228 test USDT0. The source repository remains private.
+
+Hosted testing exposed an Express/Worker response-encoding issue for large JSON. Worker API mode now delegates compression to Cloudflare; the local runtime regression checks a completed response above the compression threshold through the actual Node HTTP bridge. The first hosted API smoke attempt failed parsing its response; it is not recorded as a passing API acceptance run. Do not retry that purchase by creating a new intent or reset its ledger.
 
 ## Rollback
 
