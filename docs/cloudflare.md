@@ -49,6 +49,12 @@ The initial deployment had payments disabled; the owner subsequently approved ac
 
 Hosted testing exposed an Express/Worker response-encoding issue for large JSON. Worker API mode now delegates compression to Cloudflare; the local runtime regression checks a completed response above the compression threshold through the actual Node HTTP bridge. The first hosted API smoke attempt failed parsing its response; it is not recorded as a passing API acceptance run. Do not retry that purchase by creating a new intent or reset its ledger.
 
+## Verification update, 2026-10-01
+
+The full post-fix hosted API smoke test passed: run `7b6ea678-3abe-4567-9b49-b8384b6e7fc8`, transaction https://testnet.stablescan.xyz/tx/0x13635526a6405587ef81b33860c5f7caa0e9e6a2dca92876ced21b5732df03e8. Duplicate authorization and resume returned the same purchase and receipt, and the explorer resolved successfully. Evidence is in `evidence/live/7b6ea678-3abe-4567-9b49-b8384b6e7fc8.json`.
+
+The logged-in account's Domains overview contains no DNS zones. To attach agentic.stable.xyz, an operator with the stable.xyz zone must authorize the route/custom-domain setup. Inspect existing records before changing anything, configure the Worker domain and PUBLIC_ORIGIN together, and verify HTTPS, origin restrictions, and canonical metadata afterward. The workers.dev origin remains the verified deployment; no DNS change or repository visibility change has been made.
+
 ## Rollback
 
 Disable new purchase/session authorization if readiness or accounting checks fail. Preserve the Durable Object and its signing state and continue reconciliation of already signed transactions. Do not erase storage or start a fresh funding object. Roll back Worker code only to a version compatible with the durable schema, then verify receipts and reservations before re-enabling new work.

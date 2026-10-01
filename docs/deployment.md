@@ -1,6 +1,6 @@
 # Deployment
 
-For the requested Cloudflare deployment, use the [Cloudflare guide](/docs/cloudflare/). Its durable storage adapter is locally verified; account authorization and hosted verification are still pending. The Node/Docker deployment below remains supported.
+For the live Cloudflare deployment, use the [Cloudflare guide](/docs/cloudflare/). The site runs at https://agentic-stable.angela-f4b.workers.dev with verified hosted browser and API purchases. The Node/Docker deployment below remains supported.
 
 Run the API and built frontend together as one Node 22 process, backed by a durable local volume. The supplied Dockerfile and Compose configuration preserve SQLite state. This is not a static-only deployment.
 
@@ -30,7 +30,7 @@ Staging is noindexed. The root response includes the canonical URL only when `PU
 
 ## Hosting prerequisites
 
-The parent workspace instructions require the Stripe Projects CLI for provider provisioning. Inspect `stripe projects status` and `stripe projects catalog` before choosing a compatible persistent host. No provider, hosting account, or DNS access has been supplied for this repository. Do not select a stateless host for the current SQLite design.
+The parent workspace instructions require the Stripe Projects CLI for provider provisioning. Its Cloudflare catalog offered no deployable service, so this deployment used Wrangler with the owner's existing Cloudflare login and SQLite-backed Durable Objects. The account's Domains overview was checked on 2026-10-01 and contains no zones; custom-domain authorization is still needed.
 
 Required before public launch: dedicated funded testnet wallet, protected encryption key, verified seller recipient, persistent host and backups, TLS, authorized domain mapping, a published repository URL, and passing live acceptance evidence. See [acceptance](/docs/acceptance/).
 

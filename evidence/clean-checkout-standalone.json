@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-01T20:02:14.044Z",
+  "result": {
+    "type": "invoice-extraction",
+    "sampleId": "sample-invoice-01",
+    "vendor": "Example Studio",
+    "invoiceNumber": "DEMO-001",
+    "currency": "USD",
+    "lineItems": [
+      {
+        "description": "Design review",
+        "quantity": "2",
+        "unitPrice": "25.00",
+        "total": "50.00"
+      }
+    ],
+    "total": "50.00"
+  },
+  "receipt": {
+    "id": "f4603815-2053-4fc0-875a-014c8eea2ef4",
+    "purchaseId": "fd244f2d-f4bf-43a9-bd8b-5d1bf3373a48",
+    "quoteId": "fd244f2d-f4bf-43a9-bd8b-5d1bf3373a48",
+    "network": {
+      "name": "Stable Testnet",
+      "chainId": 2201,
+      "explorerBaseUrl": "https://testnet.stablescan.xyz"
+    },
+    "asset": {
+      "id": "stable-testnet:native",
+      "symbol": "USDT0",
+      "kind": "native",
+      "address": null,
+      "decimals": 18
+    },
+    "payer": "0xc007a4948eee3d7f6806ef3b2363330c81f6a402",
+    "payee": "0x386eE444ee58E1366E02E6361b67E970B514Ca64",
+    "pricePaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "10000000000000000"
+    },
+    "networkFeePaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "222500000000000"
+    },
+    "totalPaid": {
+      "assetId": "stable-testnet:native",
+      "amountAtomic": "10222500000000000"
+    },
+    "txHash": "0x6cc4fcb6c8c6b5d371153c1136c98e9d08e6bddb90bb74ec9a184811a079f6f1",
+    "explorerUrl": "https://testnet.stablescan.xyz/tx/0x6cc4fcb6c8c6b5d371153c1136c98e9d08e6bddb90bb74ec9a184811a079f6f1",
+    "settledAt": "2026-10-01T20:02:08.000Z"
+  },
+  "remainingBudgetAtomic": "9777500000000000",
+  "sameReceiptOnRecovery": true
+}
