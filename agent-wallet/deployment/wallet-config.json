@@ -1,0 +1,10 @@
+{
+  "chainId": 2201,
+  "rpcUrl": "https://rpc.testnet.stable.xyz",
+  "token": "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9",
+  "alice": "0x32D1d5bbcC0310EB7427D2Aa50952b158B179665",
+  "implementation": "0x77C25E265b56a35a570be90f9b6e39e6B035Ed58",
+  "implementationCodeHash": "0x8b9f25770b4ec763f236ef0108ea71ee86be1dc601e85f0e6e34cab06b4518a7",
+  "approvalUrl": "https://agentic-stable.angela-f4b.workers.dev",
+  "defaultAgent": "0x8A0b15F5fb6fea3432c92233DdeaF31873b59238"
+}

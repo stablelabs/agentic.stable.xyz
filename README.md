@@ -6,7 +6,7 @@ Alice creates grants and can fund the agent for gas in the app. The agent pays p
 
 ## Run locally
 
-Use Node.js 20.18+ and [Foundry](https://getfoundry.sh/introduction/installation). Run all commands from this repository root:
+Use Node.js 22+ and [Foundry](https://getfoundry.sh/introduction/installation). Run all commands from this repository root:
 
 ```sh
 npm ci
@@ -43,3 +43,17 @@ See the [wallet guide](agent-wallet/README.md) for account upgrades, payment com
 The existing `wallet:*` commands remain available. Application source, contracts, clients, scripts, and tests live under `agent-wallet/`; root files provide npm and TypeScript tooling. `.agent-wallet/` holds ignored local keys, configuration, and transaction journals. The production build is generated in `agent-wallet/app/dist/`.
 
 This is test-only code. Mainnet, gas sponsorship, and per-purchase approvals are outside its scope.
+
+## Cloudflare deployment
+
+The existing Worker is `agentic-stable`, at [agentic-stable.angela-f4b.workers.dev](https://agentic-stable.angela-f4b.workers.dev). Deploy from the repository root with the existing Cloudflare account login:
+
+```sh
+npm run deploy:cloudflare
+```
+
+This builds the wallet, generates Worker types, and replaces the build's browser configuration with the versioned public settings in `agent-wallet/deployment/wallet-config.json`. No local key or transaction journal is read or uploaded. Update that public configuration when deploying a different Alice account or implementation.
+
+For Cloudflare Workers Builds connected to this repository, use Node 22+, root directory `/`, build command `npm run build:cloudflare`, and deploy command `npx wrangler deploy`. Those settings are managed in Cloudflare's dashboard; the Wrangler configuration identifies the existing Worker and its account.
+
+The small `FundingLedger` export and its existing migration retain the retired demo's Cloudflare storage. The wallet serves static assets and does not access that ledger or expose the former payment API. Do not delete the namespace or add a deletion migration as part of routine deployment.

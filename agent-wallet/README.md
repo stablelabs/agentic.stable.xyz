@@ -22,7 +22,7 @@ chmod 600 agent-wallet/.env.alice.local
 
 ## Setup or upgrade
 
-Run commands from the repository root. Node 20.18+ and [Foundry](https://getfoundry.sh/introduction/installation) are required. Solidity is pinned to 0.8.30.
+Run commands from the repository root. Node 22+ and [Foundry](https://getfoundry.sh/introduction/installation) are required. Solidity is pinned to 0.8.30.
 
 ```sh
 npm run wallet:contracts

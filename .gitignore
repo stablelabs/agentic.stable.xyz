@@ -4,7 +4,6 @@ node_modules/
 
 # Private wallet keys, state, signed transactions and local environment files
 .agent-wallet/
-.env
 .env.*.local
 agent-wallet/.env.alice.local
 
@@ -15,3 +14,10 @@ agent-wallet/app/dist/
 agent-wallet/app/public/wallet-config.json
 agent-wallet/test-results/
 playwright-report/
+.wrangler/
+.dev.vars*
+agent-wallet/deployment/env.d.ts
+
+.projects/*
+!.projects/state.json
+.env

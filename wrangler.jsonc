@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "agentic-stable",
+  "account_id": "f4b35e7152bbc8dccd74ac670a6d3308",
+  "main": "agent-wallet/deployment/worker.ts",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "./agent-wallet/app/dist", "binding": "ASSETS" },
+  // Retain the existing namespace and data. The wallet does not use this binding.
+  "durable_objects": {
+    "bindings": [{ "name": "FUNDING_LEDGER", "class_name": "FundingLedger" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FundingLedger"] }],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}
