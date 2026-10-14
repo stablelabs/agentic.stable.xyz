@@ -52,7 +52,7 @@ The existing Worker is `agentic-stable`, at [agentic-stable.angela-f4b.workers.d
 npm run deploy:cloudflare
 ```
 
-This builds the wallet, generates Worker types, and replaces the build's browser configuration with the versioned public settings in `agent-wallet/deployment/wallet-config.json`. No local key or transaction journal is read or uploaded. Update that public configuration when deploying a different Alice account or implementation.
+This builds the wallet, generates Worker types, and replaces the build's browser configuration with the versioned public settings in `agent-wallet/deployment/wallet-config.json`. The default `npm run build` uses these same settings, so a fresh Git checkout produces a configured demo. No local key or transaction journal is read or uploaded. Update that public configuration when deploying a different Alice account or implementation.
 
 For Cloudflare Workers Builds connected to this repository, use Node 22+, root directory `/`, build command `npm run build:cloudflare`, and deploy command `npx wrangler deploy`. Those settings are managed in Cloudflare's dashboard; the Wrangler configuration identifies the existing Worker and its account.
 

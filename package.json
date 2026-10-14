@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --config agent-wallet/vite.config.ts",
-    "build": "tsc --noEmit && vite build --config agent-wallet/vite.config.ts",
+    "build": "tsc --noEmit && vite build --config agent-wallet/vite.config.ts && node --import tsx agent-wallet/scripts/prepare-cloudflare.ts",
     "preview": "vite preview --config agent-wallet/vite.config.ts",
     "check": "tsc --noEmit",
     "contracts": "node --import tsx agent-wallet/scripts/build-contracts.ts",
@@ -28,7 +28,7 @@
     "wallet:test": "npm test",
     "wallet:test:browser": "npm run test:browser",
     "wallet:live": "node --import tsx agent-wallet/scripts/live-acceptance.ts",
-    "build:cloudflare": "npm run build && node --import tsx agent-wallet/scripts/prepare-cloudflare.ts",
+    "build:cloudflare": "npm run build",
     "cloudflare:types": "wrangler types agent-wallet/deployment/env.d.ts",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "prebuild": "npm run cloudflare:types",
