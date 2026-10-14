@@ -5,6 +5,6 @@
     "strict": true, "esModuleInterop": true, "skipLibCheck": true,
     "resolveJsonModule": true, "types": ["node", "vite/client"], "noEmit": true
   },
-  "include": ["web", "server", "shared", "examples", "scripts", "tests", "*.ts"],
-  "exclude": ["worker-configuration.d.ts", "cloudflare"]
+  "include": ["agent-wallet/**/*.ts", "agent-wallet/**/*.tsx"],
+  "exclude": ["node_modules", "agent-wallet/out", "agent-wallet/cache", "agent-wallet/app/dist"]
 }

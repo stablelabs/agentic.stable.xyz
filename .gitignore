@@ -1,18 +1,17 @@
 node_modules/
-dist/
-.env.*.local
-data/
-test-results/
-playwright-report/
-public/docs/*/index.html
 *.log
-.buyer-state/
-evidence/screenshots/native-zoom-200.png
+.DS_Store
 
-.projects/*
-!.projects/state.json
+# Private wallet keys, state, signed transactions and local environment files
+.agent-wallet/
 .env
-.wrangler/
-.dev.vars
-.dev.vars.*
-worker-configuration.d.ts
+.env.*.local
+agent-wallet/.env.alice.local
+
+# Generated contract artifacts, browser build and test reports
+agent-wallet/out/
+agent-wallet/cache/
+agent-wallet/app/dist/
+agent-wallet/app/public/wallet-config.json
+agent-wallet/test-results/
+playwright-report/
