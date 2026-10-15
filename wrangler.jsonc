@@ -6,6 +6,7 @@
   "compatibility_date": "2026-10-14",
   "workers_dev": true,
   "preview_urls": false,
+  "routes": [{ "pattern": "agentic.stable.xyz", "custom_domain": true }],
   "assets": { "directory": "./agent-wallet/app/dist", "binding": "ASSETS" },
   // Retain the existing namespace and data. The wallet does not use this binding.
   "durable_objects": {

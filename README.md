@@ -46,7 +46,7 @@ This is test-only code. Mainnet, gas sponsorship, and per-purchase approvals are
 
 ## Cloudflare deployment
 
-The repository-linked Worker is `agentic-stable` in Cloudflare account `800c4ef344ae29a93b1588a10962b72c`, at [agentic-stable.brian-800.workers.dev](https://agentic-stable.brian-800.workers.dev). Deploy from the repository root with access to that Cloudflare account:
+The repository-linked Worker is `agentic-stable` in Cloudflare account `800c4ef344ae29a93b1588a10962b72c`, serving [agentic.stable.xyz](https://agentic.stable.xyz). Its Workers URL also remains available at [agentic-stable.brian-800.workers.dev](https://agentic-stable.brian-800.workers.dev). Deploy from the repository root with access to that Cloudflare account and the `stable.xyz` zone:
 
 ```sh
 npm run deploy:cloudflare
