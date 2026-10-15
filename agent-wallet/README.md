@@ -194,7 +194,10 @@ npm run wallet:live -- --phase prepare
 - **Public demo:** [agentic.stable.xyz](https://agentic.stable.xyz).
 - **Worker:** `agentic-stable`; Cloudflare account `800c4ef344ae29a93b1588a10962b72c`.
 - **Command:** `npm run deploy:cloudflare`, with access to that account and the `stable.xyz` zone.
+- **GitHub Actions:** [deploy.yml](../.github/workflows/deploy.yml) builds and deploys pushes to `main`. Other branches cannot deploy. It requires a `CLOUDFLARE_API_TOKEN` repository secret.
 - **Workers Builds:** root `/`; Node 22+; build `npm run build`; deploy `npx wrangler deploy`.
+
+Use one automatic deployment path. Disable native Workers Builds when using GitHub Actions. The deployment token is separate from Alice's and the agent's signing keys. Keep it in GitHub Secrets, outside source files.
 
 `npm run dev` reads generated local public settings. Production builds use [deployment/wallet-config.json](deployment/wallet-config.json), which fixes the demo's Alice, implementation, and agent addresses. To host another setup, update those public settings from the verified local setup. Copy no keys or journals.
 
