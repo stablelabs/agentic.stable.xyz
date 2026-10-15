@@ -83,6 +83,6 @@ Open [localhost:5174](http://localhost:5174) in Chrome. Retain your keys and tra
 - [Recover a payment after a timeout](agent-wallet/README.md#4-recover-without-paying-twice).
 - [Run local checks and live acceptance](agent-wallet/README.md#checks).
 - [Deploy to Cloudflare](agent-wallet/README.md#deploy).
-- [Read the contract](agent-wallet/contracts/AgentWallet.sol), [shared client](agent-wallet/client), or [UI](agent-wallet/app/src).
+- [Read the contract](agent-wallet/contracts/AgentWallet.sol), [shared client](agent-wallet/client/client.ts), or [UI](agent-wallet/app/src/App.tsx).
 
 This demo proves bounded transfers. It does not provide merchant delivery, gas sponsorship, an AI decision system, or production custody.

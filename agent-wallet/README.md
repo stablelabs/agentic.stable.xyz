@@ -123,7 +123,7 @@ sequenceDiagram
     Account-->>Alice: Grant created: Active
     Alice->>Agent: Separate native USDT0 gas top-up
     Agent->>Account: pay(grant ID, payment ID, recipient, amount)
-    Account->>Account: Check grant; record spending and ID
+    Account->>Account: Check grant, record spending and ID
     Account->>Token: transfer(recipient, amount) from Alice
     Token-->>Account: Transfer succeeds
     Account-->>Agent: Matching Payment event
