@@ -46,7 +46,7 @@ This is test-only code. Mainnet, gas sponsorship, and per-purchase approvals are
 
 ## Cloudflare deployment
 
-The existing Worker is `agentic-stable`, at [agentic-stable.angela-f4b.workers.dev](https://agentic-stable.angela-f4b.workers.dev). Deploy from the repository root with the existing Cloudflare account login:
+The repository-linked Worker is `agentic-stable` in Cloudflare account `800c4ef344ae29a93b1588a10962b72c`, at [agentic-stable.brian-800.workers.dev](https://agentic-stable.brian-800.workers.dev). Deploy from the repository root with access to that Cloudflare account:
 
 ```sh
 npm run deploy:cloudflare

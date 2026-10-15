@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "agentic-stable",
-  "account_id": "f4b35e7152bbc8dccd74ac670a6d3308",
+  "account_id": "800c4ef344ae29a93b1588a10962b72c",
   "main": "agent-wallet/deployment/worker.ts",
   "compatibility_date": "2026-10-14",
   "workers_dev": true,
