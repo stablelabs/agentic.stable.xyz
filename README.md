@@ -18,7 +18,7 @@ Alice gives the agent a **grant**: permission to pay one recipient, up to a tota
 The agent uses its own key. Alice authorizes the grant once; the contract checks each payment.
 
 ```mermaid
-flowchart LR
+flowchart TD
     Alice[Alice: wallet owner] -->|Authorizes a grant|Account[Alice's account: checks every payment]
     Alice -->|Sends a separate gas top-up|Agent[Agent: local signer]
     Agent -->|Submits a signed payment|Account
