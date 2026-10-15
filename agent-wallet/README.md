@@ -1,85 +1,71 @@
-# Agent Wallet PoC — Alice creates grants
+# Wallet guide
 
-Alice creates and authorizes a grant in one Chrome MetaMask transaction. The agent only submits payments from Alice's existing EIP-7702 address, within limits enforced onchain. Alice pays creation and administration gas; the agent pays its payment transaction gas separately.
+[Start with the overview](../README.md) for grants, gas, and the spending example. This guide covers operating the demo.
 
-## Alice's local key
+## 1. Set up Alice and the agent
 
-The ignored, mode-600 file is:
-
-```text
-/Users/angelagilhotra/code/stable/agentic.stable.xyz/agent-wallet/.env.alice.local
-```
-
-Put a fresh test-only key after `ALICE_PRIVATE_KEY=` on line 2. Use that same account in Chrome MetaMask. Only the enable/upgrade script reads this key. The web app accepts public grant terms and uses MetaMask to sign; it never reads a private key file.
-
-For a fresh checkout:
+- Use Node.js 22+, [Foundry](https://getfoundry.sh/introduction/installation), and Chrome MetaMask. Solidity is pinned to `0.8.30`.
+- Choose a fresh test-only Alice account. Use the same address in MetaMask and the local setup script.
+- Fund Alice with test USDT0 before enabling her account. Deployment and activation cost gas. See the [Stable faucet](https://faucet.stable.xyz).
+- Run these commands from the repository root:
 
 ```sh
+npm ci
 umask 077
-cp agent-wallet/.env.alice.example agent-wallet/.env.alice.local
+cp -n agent-wallet/.env.alice.example agent-wallet/.env.alice.local
 chmod 600 agent-wallet/.env.alice.local
 ```
 
-## Setup or upgrade
-
-Run commands from the repository root. Node 22+ and [Foundry](https://getfoundry.sh/introduction/installation) are required. Solidity is pinned to 0.8.30.
+- Set `ALICE_PRIVATE_KEY` in `agent-wallet/.env.alice.local`: `0x` followed by 64 hexadecimal characters. Use a test-only key.
+- Only `wallet:enable` reads this file. Never enter a private key in the web app.
+- The example file also sets the testnet RPC and local approval-page URL.
 
 ```sh
-npm run wallet:contracts
+npm run contracts
 npm run wallet:enable
 npm run wallet:init-agent
-npm run wallet:dev
+npm run dev
 ```
 
-If Alice was already enabled for the previous v1 or v2 flow, use:
+- `wallet:enable` deploys the implementation and authorizes it at Alice's existing address through EIP-7702. It verifies the installed code.
+- `wallet:init-agent` generates a separate key and prints its address. Repeating it retains the existing key.
+- Open [localhost:5174](http://localhost:5174) in Chrome. Connect Alice in MetaMask.
+
+**Retain local state:** `.agent-wallet/` contains the agent's plaintext key, configuration, and transaction journals. File permissions restrict access: `700` for the directory, `600` for private files. This is not encrypted storage. Do not delete it to fix an error.
+
+## 2. Authorize a grant, then fund gas
+
+Enter these terms in the app:
+
+| Field | Example | Meaning |
+| --- | --- | --- |
+| Agent signer | Address from `wallet:init-agent` | Key allowed to submit payments |
+| Allowed recipient | Your test recipient's address | Only destination for this grant |
+| Cumulative budget | `0.01` USDT0 | Total allowed across successful payments |
+| Expires | A future UTC time | Payments must execute before this deadline |
+
+- Click **Create and authorize grant**. Review and confirm in MetaMask.
+- One transaction creates an **Active** grant. Save its grant ID.
+- Check **Agent gas** below the grant. If needed, review the amount and click **Fund agent gas**. Confirm this separate transfer in MetaMask.
+- Alice pays both transaction fees. Gas funding belongs to the agent and does not reduce the grant's recorded budget.
+
+The gas reserve estimates one payment, adds 50% extra gas, and uses twice the current base fee. The suggested top-up targets three payments. Costs can change; a failed check shows an unavailable status.
+
+To prefill a grant without submitting a transaction:
 
 ```sh
-npm run wallet:enable -- --upgrade
-```
-
-The upgrade validates the saved implementation and current delegation, deploys v3, then uses Alice's local owner key to authorize the new implementation on chain 2201. Both v1 and v2 storage layouts are compatible with v3. Alice retains her address. The storage namespace, grant layout, status values, spending, and used-payment-ID mapping are preserved. Existing v1 deployment and activation journals are retained; the old public configuration is archived in `.agent-wallet/upgrade-v3-previous.json`. New transactions use `deployment-v3.json` and `activation-v3.json` and resume from their saved signed bytes after an interruption.
-
-The script refuses unrelated account code, different account/RPC configuration, unsupported versions, and an unexpected activation target. The app and payment client require v3. There is no activation or upgrade button in the browser.
-
-Agent initialization creates or retains `.agent-wallet/agent-key.json` with mode 600 in a mode-700 directory. This is a plaintext local test keystore protected by OS permissions. Its public address is included in the browser configuration to prefill the agent signer field. Fund the agent with test USDT0 for payment gas, using the [Stable faucet](https://faucet.stable.xyz) or a testnet transfer. Alice's balance does not fund an agent-signed transaction automatically.
-
-## Alice creates the grant
-
-Open [http://localhost:5174](http://localhost:5174) in Chrome and connect Alice in MetaMask. Enter:
-
-- Agent signer: the address printed by `npm run wallet:init-agent`.
-- Allowed recipient: the recipient's public test address.
-- Cumulative budget: for example `0.01` USDT0, with at most six fractional digits.
-- Expiry: a future UTC timestamp, for example `2026-10-15T18:00:00Z`.
-
-Review the exact terms and click **Create and authorize grant**. Confirm in MetaMask. Alice pays this transaction's gas. The confirmed grant appears as **Active** and displays its full grant ID. No agent request or separate grant approval transaction is needed.
-
-MetaMask rejects dapp-originated transactions with calldata sent directly to an account it owns. The v3 implementation route avoids that unsupported self-call form while retaining owner checks.
-
-The browser saves the draft grant ID and terms before submission, retains them after a rejected wallet prompt, and tracks the transaction hash across reloads. Receipt success plus the exact matching `GrantCreated` event is required. A confirmed grant ID cannot be overwritten.
-
-An optional public form-link helper prepares the fields without signing or submitting any transaction:
-
-```sh
+expires=$(node -p 'new Date(Date.now() + 86400000).toISOString().replace(/\.\d{3}Z$/, "Z")')
 npm run wallet:grant-link -- \
   --recipient 0xRECIPIENT_ADDRESS \
   --budget 0.01 \
-  --expires 2026-10-15T18:00:00Z
+  --expires "$expires"
 ```
 
-Adjust the example expiry and replace the recipient placeholder. The agent is prefilled from the public configuration, or may be specified with `--agent 0xAGENT_ADDRESS`. `wallet:request` is retired and exits with instructions for the new flow.
+Replace the recipient placeholder. The agent defaults to the initialized signer; `--agent 0xAGENT_ADDRESS` overrides it. Alice still reviews and authorizes the terms. `wallet:request` is retired.
 
-## Alice funds the agent for gas
+## 3. Pay from the agent
 
-After creation, every Active grant shows an **Agent gas** panel with the signer's native USDT0 balance and whether it covers the estimated reserve for one payment. The estimate simulates a new payment for the remaining grant budget without signing or submitting it. It includes 50% extra gas, a fee cap of twice the current base fee, and upward rounding to six decimals. Costs can change; the estimate does not guarantee a later payment. A failed RPC check is shown as unavailable rather than sufficient.
-
-If funding is needed, review the suggested top-up for three estimated payments, or enter another positive amount with at most six decimals. Click **Fund agent gas** and confirm the separate native USDT0 transfer in MetaMask. Alice pays this transfer's fee. The destination and amount are displayed before signing. Funding is outside the grant budget, belongs to the agent, and is not recovered by revoking a grant.
-
-The app verifies the funding receipt and exact sender, recipient, amount, and absence of calldata. It retains the transaction hash across reloads, refreshes the gas balance after confirmation and during regular grant refreshes, and provides **Check gas balance**. Unknown funding outcomes block another top-up until **Check funding confirmation** resolves the saved transaction. Rejection or a reverted transfer leaves the grant authorized.
-
-## The agent pays
-
-Use the grant ID confirmed in the app:
+Use the confirmed grant ID and its exact recipient:
 
 ```sh
 npm run wallet:pay -- \
@@ -88,61 +74,135 @@ npm run wallet:pay -- \
   --amount 0.006
 ```
 
-The agent signs locally and pays its own gas. Payment funds come from Alice. Another new `0.006` payment exceeds the remaining `0.004` and is blocked. A subsequent `0.004` payment can still succeed. Alice can revoke an Active grant in MetaMask at any time; there are no per-purchase approvals.
+- The script saves a payment ID before submission, then signs locally with the agent's key.
+- The agent pays gas. Alice supplies the `0.006` payment.
+- Under a `0.01` grant, another `0.006` is blocked. A new `0.004` payment can use the remainder.
+- Amounts accept at most six decimal places. Extra digits are rejected, not rounded.
 
-A grant is a spending permission, not a reservation of funds. Alice needs enough USDT0 for payments and her own gas. Stable's native 18-decimal gas balance and six-decimal ERC-20 balance are views of the same underlying asset and must not be added together.
+Stable exposes USDT0 as a native gas balance with 18 decimals and an ERC-20 balance with six decimals. These represent the same underlying funds. Do not add them together.
 
-## Payment recovery
+## 4. Recover without paying twice
 
-The agent durably saves the payment ID, exact terms, complete signed transaction, hash, and nonce before broadcasting. Private journal writes use `fsync`, atomic rename, and directory `fsync`. Local signing commands use an exclusive lock.
+A timeout means the outcome is unknown. It does not prove failure.
 
-After an unknown submission outcome, rerun the same command with `--payment-id 0xSAVED_PAYMENT_ID` and identical terms. Confirmed payments are reported again without another transaction; unconfirmed payments reuse identical signed bytes. Changing terms for an existing ID is refused. Omitting the ID deliberately creates a new intent. Never delete journals to resolve an unknown transaction. Check its hash first. Remove a stale command lock only after verifying its recorded process has stopped.
+- Check the transaction hash first.
+- Retry with the printed payment ID and identical terms:
 
-Receipt success and the exact matching `Payment` event are required. Cancellation or replacement with a different action is not payment confirmation. Repricing the same action is supported. A preflight rejection costs no gas; a reverted included payment may cost the agent gas while leaving Alice's funds and spending unchanged.
+```sh
+npm run wallet:pay -- \
+  --grant 0xGRANT_ID \
+  --recipient 0xRECIPIENT_ADDRESS \
+  --amount 0.006 \
+  --payment-id 0xSAVED_PAYMENT_ID
+```
 
-## Contract enforcement and legacy records
+- The journal retains the intent, signed transaction, hash, and nonce before broadcast. Retries reuse signed bytes or report the existing confirmation.
+- Omitting `--payment-id` creates a new intent. Do not do that to recover an unknown payment.
+- A successful receipt must contain the matching `Payment` event. A cancellation or replacement with a different action is not confirmation.
+- Rejection before submission costs no gas. An included revert can cost gas, but rolls back the payment, spending, and used-ID marker.
 
-`createGrant(id, agent, recipient, budget, expiresAt)` is owner-only and creates an Active grant atomically. For MetaMask compatibility, Alice sends her transaction to the fixed implementation contract's `createGrantFor(Alice, ...)` entry point. That entry point requires Alice to be the actual transaction caller and verifies that Alice delegates to that exact implementation. It then calls Alice's account, which trusts its immutable implementation for these named owner administration operations. Direct Alice-signed self-calls remain valid for local clients. The same route supports revocation and legacy approval/rejection; there is no arbitrary forwarding function. Alice pays the outer transaction's gas. The agent cannot create grants or change permissions. There is no production `requestGrant` entry point.
+The UI also retains submitted grant and gas-funding hashes across reloads. Unknown funding outcomes block another top-up until **Check funding confirmation** resolves the saved transaction.
 
-Each payment checks Active status, exact agent signer, exact recipient, expiry (`block.timestamp < expiresAt`), positive amount, remaining cumulative budget, and a nonzero payment ID unused anywhere in Alice's account. Spending and the used-ID marker update before the fixed token transfer under a reentrancy guard; transfer failure reverts both updates. No arbitrary calls, token approvals, relayer, or sponsorship path is exposed. Mainnet is blocked in the contract and clients.
+## How transactions reach Alice's account
 
-Old Pending and Rejected status values remain in storage for migration compatibility. Only Alice can approve or reject an existing legacy Pending grant; the UI labels these actions as legacy controls. Rejected, Revoked, expired, exhausted, and uncreated grants cannot pay. Terms cannot be edited and terminal states cannot reactivate. The test fixture under `test/fixtures/` exists solely to prove v1 storage migration and legacy-state enforcement.
+The **implementation** supplies Alice's wallet code. EIP-7702 makes it execute with Alice's address, funds, and storage.
 
-The bounds constrain agent payments through this delegate. Alice's owner key retains authority over her funds and delegation. This is unaudited test-only code; production custody is outside the PoC.
+MetaMask can reject contract data sent from Alice to herself. Grant administration goes through the implementation instead. It checks that Alice sent the transaction and that her account delegates to this exact code, then forwards the action.
 
-## Live acceptance and transaction evidence
+```mermaid
+sequenceDiagram
+    participant Alice as Alice / MetaMask
+    participant Code as Implementation
+    participant Account as Alice's account
+    participant Agent as Agent / local key
+    participant Token as USDT0
 
-After enabling v3, start the app and prepare the test plan:
+    Alice->>Code: createGrantFor(Alice, terms)
+    Code->>Code: Check caller and delegation
+    Code->>Account: createGrant(terms)
+    Account-->>Alice: Grant created: Active
+    Alice->>Agent: Separate native USDT0 gas top-up
+    Agent->>Account: pay(grant ID, payment ID, recipient, amount)
+    Account->>Account: Check grant; record spending and ID
+    Account->>Token: transfer(recipient, amount) from Alice
+    Token-->>Account: Transfer succeeds
+    Account-->>Agent: Matching Payment event
+    Note over Account,Token: Transfer failure rolls back spending and the used-ID marker
+```
+
+- Agent payments go directly to Alice's account. The agent cannot use the owner administration methods.
+- Forwarding permits only grant creation, revocation, and legacy approval/rejection.
+- A reentrancy guard blocks nested payments during a transfer.
+
+## Grant states and limits
+
+```mermaid
+flowchart TD
+    Create[Alice creates grant] --> Active[Active]
+    Active -->|Alice revokes|Revoked[Revoked: payments blocked]
+    Active -->|Deadline reached|Expired[Expired: payments blocked]
+    Active -->|Budget fully spent|Exhausted[Exhausted: payments blocked]
+```
+
+- Expiry and exhaustion are derived from the deadline and spending. They do not need a separate transaction.
+- Pending and Rejected records remain for v1 compatibility. Alice can approve or reject an old Pending grant. New grants start Active.
+- Payment checks require an Active grant, its exact signer and recipient, a positive amount, remaining budget, and time strictly before expiry.
+- Successful payment IDs are unique across Alice's account, not just one grant. Grant terms cannot be edited or IDs reused.
+- Alice can revoke a grant. Revocation takes effect when included onchain; it cannot undo an earlier payment.
+- Alice retains owner authority. Revocation does not remove the persistent EIP-7702 delegation or recover gas funding.
+
+## Upgrade an existing account
+
+```sh
+npm run wallet:enable -- --upgrade
+```
+
+- The script supports known v1/v2 deployments upgrading to v3. It refuses unrelated code or mismatched account/RPC configuration.
+- Alice keeps her address. Compatible storage preserves grants, spending, and successful payment IDs.
+- Retain the deployment journals and original build for recovery after interruption.
+- The browser requires v3 and offers no activation or upgrade button.
+
+## Checks
+
+```sh
+npm run test:contracts
+npm test
+npm run test:browser
+npm run build
+```
+
+- Foundry tests cover contract rules, rollback, forwarding, migration, and 256 generated budget cases.
+- Script tests use disposable keys and Anvil on port `18545`. `npm test` compiles the contracts first.
+- Browser tests use a mock wallet and RPC. They do not prove a real MetaMask/testnet transaction succeeded.
+- Use `WALLET_SOLC=/path/to/solc-0.8.30` if the compiler is installed separately. The `wallet:*` test/build aliases remain available.
+
+For real testnet receipts:
 
 ```sh
 npm run wallet:live -- --phase prepare
 ```
 
-Preparation creates public grant-form links locally and sends no agent grant transactions. In Chrome MetaMask, Alice creates the expiring grant first, then the main and revoked grants, using the printed links. Revoke the revoked grant after creating it. The expiring grant has a five-minute creation window.
+- Open the printed links in Chrome. Create the expiring grant within five minutes, then the main and revocable grants. Revoke the latter. Fund the agent.
+- Run `npm run wallet:live -- --phase exercise`. If it waits for expiry, repeat after the printed deadline.
+- Run `npm run wallet:live -- --phase report` to refresh the evidence.
+- The runner checks successful payments and blocked uncreated, revoked, expired, exhausted, wrong-signer, wrong-recipient, duplicate, and over-budget attempts.
+- Negative attempts are deliberately included and reverted; they spend gas. Successful payments total `0.01` test USDT0. The agent also funds a test wrong-signer account with `0.01` for gas.
+- `.agent-wallet/live-evidence.{json,md}` records hashes, receipt results, blocks, at least two confirmations, and fees. Receipt checks verify exact actions and events; observing MetaMask remains a separate check.
 
-Then, with the agent funded:
+## Deploy
 
-```sh
-npm run wallet:live -- --phase exercise
-# Repeat after the printed UTC expiry if the last check is waiting.
-npm run wallet:live -- --phase report
-```
+- **Public demo:** [agentic.stable.xyz](https://agentic.stable.xyz).
+- **Worker:** `agentic-stable`; Cloudflare account `800c4ef344ae29a93b1588a10962b72c`.
+- **Command:** `npm run deploy:cloudflare`, with access to that account and the `stable.xyz` zone.
+- **Workers Builds:** root `/`; Node 22+; build `npm run build`; deploy `npx wrangler deploy`.
 
-The runner verifies Alice's creation/revocation transactions, then tests uncreated, revoked, expired, exhausted, wrong-signer, wrong-recipient, duplicate-ID, and over-budget payments. Negative cases are deliberately submitted with an explicit gas limit to obtain included reverted receipts. Each also checks the expected custom error in preflight and compares Alice's native/Token balances, recipient balance, spending, and the payment-ID marker before and after. Successful payments total `0.01` test USDT0. A fresh wrong-signer test account receives `0.01` test USDT0 from the agent for gas; forced payment attempts cap their maximum gas cost at `0.01` USDT0 each.
+`npm run dev` reads generated local public settings. Production builds use [deployment/wallet-config.json](deployment/wallet-config.json), which fixes the demo's Alice, implementation, and agent addresses. To host another setup, update those public settings from the verified local setup. Copy no keys or journals.
 
-Each step records its hash, receipt status, block, at least two observed confirmations, gas fee, and explorer link in `.agent-wallet/live-evidence.json` and `.agent-wallet/live-evidence.md`. Repeating a phase resumes existing work. Owner receipt checks verify Alice as sender, the implementation as destination, Alice as the forwarded account, exact action/ID/terms, and the expected event emitted by Alice's account. Actual Chrome MetaMask interaction must also be observed; the runner does not read Alice's private key or sign owner actions.
+[wrangler.jsonc](../wrangler.jsonc) retains the custom-domain route. The unused `FundingLedger` export preserves an existing storage namespace; do not delete it or add a deletion migration during routine releases.
 
-## Local verification
+## Scope
 
-```sh
-npm run wallet:test:contracts
-npm run wallet:test
-npm run wallet:test:browser
-npm run wallet:build
-```
-
-The root commands `npm run dev`, `npm run build`, `npm test`, `npm run test:contracts`, and `npm run test:browser` run this wallet application and its checks. The `wallet:*` names remain available for existing workflows.
-
-Set `WALLET_SOLC=/absolute/path/to/solc-0.8.30` when using a separately installed compiler. Script tests require compiled artifacts and free local port 18545. They use generated disposable keys and Anvil only. Browser tests inject a test provider and mocked RPC, so actual MetaMask/testnet acceptance is reported separately. The budget property test runs 256 generated payment pairs.
-
-References: [Stable Testnet](https://docs.stable.xyz/en/reference/testnet-information/), [USDT0 behavior](https://docs.stable.xyz/en/explanation/usdt0-behavior/), [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702).
+- Test-only, unaudited code. Mainnet is blocked by the contract and clients.
+- No AI model, merchant delivery, gas sponsorship, or production custody.
+- Start with the [contract](contracts/AgentWallet.sol), [client](client/client.ts), and [payment script](scripts/pay.ts) for implementation details.
+- Protocol reference: [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702). Network reference: [Stable docs](https://docs.stable.xyz).
