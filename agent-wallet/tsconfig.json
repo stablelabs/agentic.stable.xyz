@@ -1,5 +1,0 @@
-{
-  "extends": "../tsconfig.json",
-  "include": ["client", "scripts", "app", "tests", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"],
-  "exclude": ["out", "cache", "app/dist"]
-}

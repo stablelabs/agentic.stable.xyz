@@ -59,13 +59,39 @@ Grants do not reserve funds. Alice must keep enough money available. Two `0.01` 
 - Delegation persists after grant expiry. Revoking a grant does not remove the wallet code.
 - Alice's owner key still controls the account and can replace the delegation. These limits constrain the agent, not Alice.
 
-See the [wallet guide](agent-wallet/README.md#how-transactions-reach-alices-account) for the exact MetaMask and payment paths.
+See the [wallet guide](docs/wallet.md#how-transactions-reach-alices-account) for the exact MetaMask and payment paths.
+
+## Repository packages
+
+The repository is an npm workspace with four separate packages:
+
+| Package | Directory | Responsibility |
+| --- | --- | --- |
+| `agent-wallet-web` | [packages/web](packages/web) | React UI that imports owner operations from `agent-wallet-sdk`. |
+| `agent-wallet-cli` | [packages/cli](packages/cli) | Agent executable and private local state; depends on the SDK protocol entry. |
+| `agent-wallet-sdk` | [packages/sdk](packages/sdk) | Owner API and shared browser-compatible wallet protocol. |
+| `agent-wallet-contracts` | [packages/contracts](packages/contracts) | Solidity implementation, Foundry tests, migration fixtures, and compiled artifacts. |
+
+Each package owns its source, manifest, build, checks, and tests. Root `scripts/` contains operator tools and compatibility adapters, `tests/` contains integration and packaging checks, and `docs/` contains guides. The root package orchestrates the workspaces.
+
+```sh
+npm ci
+npm run build          # SDK, CLI, web app, and contracts; requires Foundry
+npm run build:cloudflare # Web deployment build; no Foundry required
+npm run dev            # Build SDK and start the web app
+npm run wallet -- --help
+npm run check
+npm test
+npm run test:browser
+```
+
+To work on one package, use `npm run build --workspace agent-wallet-sdk`, `agent-wallet-cli`, `agent-wallet-web`, or `agent-wallet-contracts`. Build the SDK before its consumers. `npm run dev:sdk` watches the SDK in a second terminal during development.
 
 ## Use the demo or run your own
 
 - The [hosted demo](https://agentic.stable.xyz) displays one configured Alice account. You can inspect its grants. Only Alice can manage them.
-- For your own account, follow the [setup guide](agent-wallet/README.md#1-set-up-alice-and-the-agent). You need Node.js 22+, Foundry, Chrome MetaMask, and test USDT0.
-- Keys stay local. Git ignores Alice's key file and the agent's keystore; see [setup](agent-wallet/README.md#1-set-up-alice-and-the-agent).
+- For your own account, follow the [setup guide](docs/wallet.md#1-set-up-alice-and-the-agent). You need Node.js 22+, Foundry, Chrome MetaMask, and test USDT0.
+- Keys stay local. Git ignores Alice's key file and the agent's keystore; see [setup](docs/wallet.md#1-set-up-alice-and-the-agent).
 - The browser uses MetaMask. Cloudflare serves the UI and public configuration; it does not run the agent or sign payments.
 
 Already set up? From the repository root:
@@ -79,10 +105,11 @@ Open [localhost:5174](http://localhost:5174) in Chrome. Retain your keys and tra
 
 ## Find the next step
 
-- [Set up, authorize, fund, and pay](agent-wallet/README.md#1-set-up-alice-and-the-agent).
-- [Recover a payment after a timeout](agent-wallet/README.md#4-recover-without-paying-twice).
-- [Run local checks and live acceptance](agent-wallet/README.md#checks).
-- [Deploy to Cloudflare](agent-wallet/README.md#deploy).
-- [Read the contract](agent-wallet/contracts/AgentWallet.sol), [shared client](agent-wallet/client/client.ts), or [UI](agent-wallet/app/src/App.tsx).
+- [Use the agent CLI](docs/cli.md) or [integrate the owner SDK](docs/sdk.md).
+- [Set up, authorize, fund, and pay](docs/wallet.md#1-set-up-alice-and-the-agent).
+- [Recover a payment after a timeout](docs/wallet.md#4-recover-without-paying-twice).
+- [Run local checks and live acceptance](docs/wallet.md#checks).
+- [Deploy to Cloudflare](docs/wallet.md#deploy).
+- [Read the contract](packages/contracts/src/AgentWallet.sol), [shared client](packages/sdk/src/client/client.ts), or [UI](packages/web/src/App.tsx).
 
 This demo proves bounded transfers. It does not provide merchant delivery, gas sponsorship, an AI decision system, or production custody.

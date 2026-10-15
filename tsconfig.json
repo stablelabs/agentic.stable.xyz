@@ -1,10 +1,25 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
-    "strict": true, "esModuleInterop": true, "skipLibCheck": true,
-    "resolveJsonModule": true, "types": ["node", "vite/client"], "noEmit": true
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   },
-  "include": ["agent-wallet/**/*.ts", "agent-wallet/**/*.tsx"],
-  "exclude": ["node_modules", "agent-wallet/out", "agent-wallet/cache", "agent-wallet/app/dist"]
+  "include": [
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "packages/*/tests/**/*.ts",
+    "packages/web/deployment/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/dist",
+    "packages/contracts/out",
+    "packages/contracts/cache"
+  ]
 }

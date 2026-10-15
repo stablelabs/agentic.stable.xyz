@@ -1,0 +1,36 @@
+{
+  "name": "agent-wallet-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agent-wallet": "./dist/main.js"
+  },
+  "exports": {
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist/agent/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "agent-wallet-sdk": "0.1.0",
+    "viem": "^2.38.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/executable.mjs",
+    "wallet": "node dist/main.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  }
+}

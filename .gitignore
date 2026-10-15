@@ -8,15 +8,16 @@ node_modules/
 agent-wallet/.env.alice.local
 
 # Generated contract artifacts, browser build and test reports
-agent-wallet/out/
-agent-wallet/cache/
-agent-wallet/app/dist/
-agent-wallet/app/public/wallet-config.json
-agent-wallet/test-results/
+packages/contracts/out/
+packages/contracts/cache/
+packages/*/dist/
+*.tgz
+packages/web/public/wallet-config.json
+packages/web/test-results/
 playwright-report/
 .wrangler/
 .dev.vars*
-agent-wallet/deployment/env.d.ts
+packages/web/deployment/env.d.ts
 
 .projects/*
 !.projects/state.json
