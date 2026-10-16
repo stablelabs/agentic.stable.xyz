@@ -136,9 +136,12 @@ async function main() {
   const packages = await packRelease(root, directory);
   if (packages.some(pkg => pkg.version !== release.version)) throw new Error('Package version changed while preparing the release.');
   if (values['dry-run']) {
-    for (const pkg of packages) {
-      await execute('npm', ['publish', resolve(directory, pkg.filename), '--access', 'public', '--registry', registry, '--dry-run'], { cwd: root });
-    }
+    const results = await publishInOrder(packages, {
+      lookup,
+      publish: async pkg => { await execute('npm', ['publish', resolve(directory, pkg.filename), '--access', 'public', '--registry', registry, '--dry-run'], { cwd: root }); },
+      wait: async () => {},
+    });
+    console.log(JSON.stringify(results.map(item => ({ ...item, status: item.status === 'published' ? 'would-publish' : item.status })), null, 2));
     console.log(`Dry run passed for ${release.tag}; packed SDK and CLI without publishing.`);
     return;
   }

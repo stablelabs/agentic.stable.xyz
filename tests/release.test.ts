@@ -92,6 +92,17 @@ it('checks both published artifacts before making any mutation', async () => {
   expect(mutations).toBe(0);
 });
 
+it('skips both exact artifacts after a complete release instead of publishing an existing version', async () => {
+  let mutations = 0;
+  const results = await publishInOrder([sdk, cli], {
+    lookup: async pkg => published(pkg),
+    publish: async () => { mutations++; },
+    wait: async () => {},
+  });
+  expect(mutations).toBe(0);
+  expect(results.map(item => item.status)).toEqual(['already-published', 'already-published']);
+});
+
 it('does not publish the CLI if the SDK is still unavailable', async () => {
   const calls: string[] = [];
   await expect(publishInOrder([sdk, cli], {

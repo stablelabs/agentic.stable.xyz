@@ -18,7 +18,7 @@ The workflow uses OIDC with `id-token: write`, Node 24, npm 11.21.0, and Foundry
 
 ## Check the workflow without publishing
 
-Run **Publish npm packages** manually from the repository's GitHub Actions page, selecting `main`. Manual runs execute all checks and dry-run the packed publishes. They cannot publish packages.
+Run **Publish npm packages** manually from the repository's GitHub Actions page, selecting `main`. Manual runs execute all checks and dry-run the packed publishes. They cannot publish packages. Matching versions already on npm are verified and skipped; changed bytes require a new version.
 
 Locally:
 
