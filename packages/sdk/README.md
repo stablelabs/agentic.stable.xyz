@@ -3,7 +3,7 @@
 Browser-compatible owner operations and shared wallet protocol. This package owns its TypeScript source, declarations, and build output. Both `agent-wallet-web` and `@stablechain/agent-wallet-cli` declare it as a dependency.
 
 ```sh
-npm install @stablechain/agent-wallet-sdk@0.1.0 viem
+npm install @stablechain/agent-wallet-sdk@0.1.1 viem
 ```
 
 ```sh

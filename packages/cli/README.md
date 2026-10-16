@@ -5,14 +5,14 @@ The `agent-wallet` executable manages the local agent signer, grants, payments, 
 Install with Node.js 22 or newer:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.1.0
+npm install --global @stablechain/agent-wallet-cli@0.1.1
 agent-wallet --help
 ```
 
 Or run directly:
 
 ```sh
-npx --yes --package=@stablechain/agent-wallet-cli@0.1.0 agent-wallet --help
+npx --yes --package=@stablechain/agent-wallet-cli@0.1.1 agent-wallet --help
 ```
 
 Each agent initializes its own signer and imports owner-provided public wallet settings. Set `WALLET_STATE_DIR` to a persistent private directory, especially in containers:

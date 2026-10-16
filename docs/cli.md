@@ -7,11 +7,11 @@ The CLI runs the local agent signer on Stable Testnet. Alice authorizes grants a
 Use Node.js 22 or newer:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.1.0
+npm install --global @stablechain/agent-wallet-cli@0.1.1
 agent-wallet --help
 ```
 
-For direct execution, use `npx --yes --package=@stablechain/agent-wallet-cli@0.1.0 agent-wallet --help`. Pin a version in automation. Keep `WALLET_STATE_DIR` on persistent private storage across runs.
+For direct execution, use `npx --yes --package=@stablechain/agent-wallet-cli@0.1.1 agent-wallet --help`. Pin a version in automation. Keep `WALLET_STATE_DIR` on persistent private storage across runs.
 
 For repository development:
 

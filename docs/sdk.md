@@ -8,7 +8,7 @@
 npm run build:tools
 npm pack ./packages/sdk
 # In a separate application, install the generated tarball and viem.
-npm install /path/to/stablechain-agent-wallet-sdk-0.1.0.tgz viem
+npm install /path/to/stablechain-agent-wallet-sdk-0.1.1.tgz viem
 ```
 
 The package exports JavaScript and TypeScript declarations, with `viem` as its peer dependency. It contains only the SDK and shared protocol modules, with no Node filesystem imports or React dependency.
