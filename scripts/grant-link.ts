@@ -1,4 +1,4 @@
-import { AgentContext, grantLink, publicError } from 'agent-wallet-cli/agent';
+import { AgentContext, grantLink, publicError } from '@stablechain/agent-wallet-cli/agent';
 import { args, stateDir } from './local';
 
 try {

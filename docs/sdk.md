@@ -1,6 +1,6 @@
 # Owner SDK
 
-`agent-wallet-sdk` exposes Alice's owner operations as a browser-compatible TypeScript library over `viem`. The existing app uses this SDK. Wallet discovery, forms, React state, storage, and private-key management remain in the consuming app.
+`@stablechain/agent-wallet-sdk` exposes Alice's owner operations as a browser-compatible TypeScript library over `viem`. The existing app uses this SDK. Wallet discovery, forms, React state, storage, and private-key management remain in the consuming app.
 
 ## Build and install locally
 
@@ -8,7 +8,7 @@
 npm run build:tools
 npm pack ./packages/sdk
 # In a separate application, install the generated tarball and viem.
-npm install /path/to/agent-wallet-sdk-0.1.0.tgz viem
+npm install /path/to/stablechain-agent-wallet-sdk-0.1.0.tgz viem
 ```
 
 The package exports JavaScript and TypeScript declarations, with `viem` as its peer dependency. It contains only the SDK and shared protocol modules, with no Node filesystem imports or React dependency.
@@ -16,7 +16,7 @@ The package exports JavaScript and TypeScript declarations, with `viem` as its p
 ## Create an owner client
 
 ```ts
-import { createOwnerClient, newGrantId, type OwnerOperation } from 'agent-wallet-sdk';
+import { createOwnerClient, newGrantId, type OwnerOperation } from '@stablechain/agent-wallet-sdk';
 
 const owner = createOwnerClient({
   config,        // Operator-provided public WalletConfig

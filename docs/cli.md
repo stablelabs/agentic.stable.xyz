@@ -2,9 +2,18 @@
 
 The CLI runs the local agent signer on Stable Testnet. Alice authorizes grants and funds gas through the browser UI. Payments use Alice's funds and the agent's gas balance.
 
-## Build and run
+## Install and run
 
-Use Node.js 22 or newer. From the repository root:
+Use Node.js 22 or newer:
+
+```sh
+npm install --global @stablechain/agent-wallet-cli@0.1.0
+agent-wallet --help
+```
+
+For direct execution, use `npx --yes --package=@stablechain/agent-wallet-cli@0.1.0 agent-wallet --help`. Pin a version in automation. Keep `WALLET_STATE_DIR` on persistent private storage across runs.
+
+For repository development:
 
 ```sh
 npm ci
@@ -15,11 +24,11 @@ npm run wallet -- --help
 For a command available outside this repository, build first and link the separate CLI package:
 
 ```sh
-npm link --workspace agent-wallet-cli
+npm link --workspace @stablechain/agent-wallet-cli
 agent-wallet --help
 ```
 
-The CLI package depends on `agent-wallet-sdk` and `viem`; it does not need Foundry, React, Vite, or `tsx` at runtime. Package it locally with `npm pack ./packages/cli`. Both packages remain private; these commands do not publish them.
+The CLI package depends on `@stablechain/agent-wallet-sdk` and `viem`; it does not need Foundry, React, Vite, or `tsx` at runtime. Package it locally with `npm pack ./packages/cli`. The prepack hook rebuilds it; the SDK must be built first in a repository checkout. Packing does not publish either package.
 
 ## Setup and authorization
 

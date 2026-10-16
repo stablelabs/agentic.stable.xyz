@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { BaseError, ContractFunctionRevertedError, decodeFunctionData, encodeFunctionData, formatUnits, parseEther, type Address, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { walletAbi, tokenAbi, EXPLORER, TOKEN, paymentCheck, publicClient, creationCheck, statusCheck, verifyAccount } from 'agent-wallet-sdk/protocol';
+import { walletAbi, tokenAbi, EXPLORER, TOKEN, paymentCheck, publicClient, creationCheck, statusCheck, verifyAccount } from '@stablechain/agent-wallet-sdk/protocol';
 import { agentAccount, args, exists, loadConfig, newId, readJson, run, saveJson, stateDir, submit, type Journal } from './local';
 
 type ReceiptEvidence = { hash: Hex; status: string; block: string; confirmations: string; fee: string; explorer: string; signer: Address };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { BaseError, createWalletClient, custom, formatUnits, type Hex, type Address } from 'viem';
-import { chain, CHAIN_ID, EXPLORER, identifier, validateConfig, type WalletConfig, formatAmount, newGrantId, type GrantDraft, grantStatus, publicClient, type Grant, createOwnerClient, type OwnerOperation } from 'agent-wallet-sdk';
+import { chain, CHAIN_ID, EXPLORER, identifier, validateConfig, type WalletConfig, formatAmount, newGrantId, type GrantDraft, grantStatus, publicClient, type Grant, createOwnerClient, type OwnerOperation } from '@stablechain/agent-wallet-sdk';
 import { metaMask, type Provider } from './metamask';
 import GasFunding from './GasFunding';
 

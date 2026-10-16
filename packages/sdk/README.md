@@ -1,12 +1,16 @@
 # Agent wallet SDK
 
-Browser-compatible owner operations and shared wallet protocol. This package owns its TypeScript source, declarations, and build output. Both `agent-wallet-web` and `agent-wallet-cli` declare it as a dependency.
+Browser-compatible owner operations and shared wallet protocol. This package owns its TypeScript source, declarations, and build output. Both `agent-wallet-web` and `@stablechain/agent-wallet-cli` declare it as a dependency.
 
 ```sh
-npm run build --workspace agent-wallet-sdk
-npm run test --workspace agent-wallet-sdk
+npm install @stablechain/agent-wallet-sdk@0.1.0 viem
 ```
 
-Apps import `createOwnerClient` and public wallet helpers from `agent-wallet-sdk`. The CLI and operator tools use the `agent-wallet-sdk/protocol` entry for ABI, verification, amount, gas, and receipt functions. Neither entry imports Node filesystem APIs or React.
+```sh
+npm run build --workspace @stablechain/agent-wallet-sdk
+npm run test --workspace @stablechain/agent-wallet-sdk
+```
 
-The package includes only `dist` and this README when packed. It remains private; local builds and packing do not publish it.
+Apps import `createOwnerClient` and public wallet helpers from `@stablechain/agent-wallet-sdk`. The CLI and operator tools use the `@stablechain/agent-wallet-sdk/protocol` entry for ABI, verification, amount, gas, and receipt functions. Neither entry imports Node filesystem APIs or React.
+
+The public npm package includes compiled JavaScript, declarations, this README, and its manifest. The prepack hook rebuilds the package before packing or publishing.

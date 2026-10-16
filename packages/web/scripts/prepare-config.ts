@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { validateConfig } from 'agent-wallet-sdk';
+import { validateConfig } from '@stablechain/agent-wallet-sdk';
 
 // Deployment reads only this versioned public configuration, never local keys or journals.
 const source = new URL('../deployment/wallet-config.json', import.meta.url);

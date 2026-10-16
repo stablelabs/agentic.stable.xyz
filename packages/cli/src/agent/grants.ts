@@ -1,4 +1,4 @@
-import { formatAmount, address, identifier, parseGrantDraft, type GrantDraft, readGrant, duration, input, WalletError } from 'agent-wallet-sdk/protocol';
+import { formatAmount, address, identifier, parseGrantDraft, type GrantDraft, readGrant, duration, input, WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 import { newId } from './state.js';
 import type { AgentContext } from './context.js';
 

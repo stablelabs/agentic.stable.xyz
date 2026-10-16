@@ -1,7 +1,7 @@
 import { lstat, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { WalletError } from 'agent-wallet-sdk/protocol';
+import { WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 
 export const newId = () => `0x${randomBytes(32).toString('hex')}` as const;
 export async function exists(path: string) {

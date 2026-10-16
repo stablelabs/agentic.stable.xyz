@@ -13,9 +13,10 @@ it('defines four source-owning workspace packages with explicit SDK dependencies
   const root = JSON.parse(await readFile('package.json', 'utf8'));
   expect(root.workspaces).toEqual(['packages/sdk', 'packages/cli', 'packages/web', 'packages/contracts']);
   expect(root.dependencies?.react).toBeUndefined();
+  const sdk = JSON.parse(await readFile('packages/sdk/package.json', 'utf8'));
   for (const name of ['sdk', 'cli', 'web', 'contracts']) {
     const manifest = JSON.parse(await readFile(`packages/${name}/package.json`, 'utf8'));
-    expect(manifest.name).toBe(`agent-wallet-${name}`);
+    expect(manifest.name).toBe(['cli', 'sdk'].includes(name) ? `@stablechain/agent-wallet-${name}` : `agent-wallet-${name}`);
     expect(manifest.scripts.build).toBeTruthy();
     expect(manifest.scripts.check).toBeTruthy();
     expect(manifest.scripts.test).toBeTruthy();
@@ -25,7 +26,7 @@ it('defines four source-owning workspace packages with explicit SDK dependencies
       expect(manifest.dependencies).toBeUndefined();
     } else {
       expect((await sources(`packages/${name}/src`)).length).toBeGreaterThan(0);
-      if (name !== 'sdk') expect(manifest.dependencies['agent-wallet-sdk']).toBe('0.1.0');
+      if (name !== 'sdk') expect(manifest.dependencies['@stablechain/agent-wallet-sdk']).toBe(sdk.version);
     }
   }
 });
@@ -43,8 +44,8 @@ it('keeps source imports inside each package and consumes shared code by package
       }
     }
     if (name === 'sdk') {
-      expect(imports.some(module => module.startsWith('node:') || module.startsWith('agent-wallet-cli') || module === 'react')).toBe(false);
-    } else expect(imports).toContain(name === 'web' ? 'agent-wallet-sdk' : 'agent-wallet-sdk/protocol');
+      expect(imports.some(module => module.startsWith('node:') || module.startsWith('@stablechain/agent-wallet-cli') || module === 'react')).toBe(false);
+    } else expect(imports).toContain(name === 'web' ? '@stablechain/agent-wallet-sdk' : '@stablechain/agent-wallet-sdk/protocol');
   }
 });
 

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, encodeFunctionResult, keccak256, toHex, type Hex } from 'viem';
-import { walletAbi, tokenAbi } from 'agent-wallet-sdk/protocol';
-import { TOKEN } from 'agent-wallet-sdk/protocol';
+import { walletAbi, tokenAbi } from '@stablechain/agent-wallet-sdk/protocol';
+import { TOKEN } from '@stablechain/agent-wallet-sdk/protocol';
 
 const alice = '0x1111111111111111111111111111111111111111';
 const agent = '0x2222222222222222222222222222222222222222';

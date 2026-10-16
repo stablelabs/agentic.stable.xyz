@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { encodeFunctionData, keccak256 } from 'viem';
 import { AgentContext } from '../src/agent/context';
 import { loadPayment, type PaymentJournal } from '../src/agent/payments';
-import { walletAbi } from 'agent-wallet-sdk/protocol';
+import { walletAbi } from '@stablechain/agent-wallet-sdk/protocol';
 import { exists } from '../src/agent/state';
 
 const directories: string[] = [];

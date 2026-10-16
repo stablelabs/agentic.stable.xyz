@@ -1,7 +1,6 @@
 {
-  "name": "agent-wallet-cli",
+  "name": "@stablechain/agent-wallet-cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "bin": {
     "agent-wallet": "./dist/main.js"
@@ -19,7 +18,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "agent-wallet-sdk": "0.1.0",
+    "@stablechain/agent-wallet-sdk": "0.1.0",
     "viem": "^2.38.0"
   },
   "devDependencies": {
@@ -31,6 +30,29 @@
     "build": "tsc -p tsconfig.json && node scripts/executable.mjs",
     "wallet": "node dist/main.js",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts"
-  }
+    "test": "vitest run --config vitest.config.ts",
+    "prepack": "npm run build"
+  },
+  "description": "Agent signer, grant discovery, bounded payments, and recovery for Agent Wallet on Stable Testnet.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stablelabs/agentic.stable.xyz.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/stablelabs/agentic.stable.xyz/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/stablelabs/agentic.stable.xyz/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "stablechain",
+    "agent-wallet",
+    "eip-7702",
+    "payments",
+    "testnet",
+    "cli"
+  ]
 }

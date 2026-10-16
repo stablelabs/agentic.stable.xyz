@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatUnits, type Address, type Hex } from 'viem';
-import { parseAmount, type WalletConfig, publicClient, type Grant, fundingSuggestion, NATIVE_PER_TOKEN_UNIT, createOwnerClient } from 'agent-wallet-sdk';
+import { parseAmount, type WalletConfig, publicClient, type Grant, fundingSuggestion, NATIVE_PER_TOKEN_UNIT, createOwnerClient } from '@stablechain/agent-wallet-sdk';
 
 export default function GasFunding({ config, id, grant, connected, busy, onFund }: {
   config: WalletConfig; id: Hex; grant: Grant; connected: boolean; busy: boolean;

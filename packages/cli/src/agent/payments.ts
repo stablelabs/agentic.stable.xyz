@@ -1,5 +1,5 @@
 import { BaseError, ContractFunctionRevertedError, createWalletClient, encodeFunctionData, formatUnits, http, keccak256, parseTransaction, recoverTransactionAddress, type Hex, type TransactionSerialized } from 'viem';
-import { walletAbi, tokenAbi, address, chain, CHAIN_ID, identifier, TOKEN, type WalletConfig, formatAmount, parseAmount, paymentCheck, trackTransaction, verifyNetwork, type PublicClient, type WaitOptions, input, WalletError } from 'agent-wallet-sdk/protocol';
+import { walletAbi, tokenAbi, address, chain, CHAIN_ID, identifier, TOKEN, type WalletConfig, formatAmount, parseAmount, paymentCheck, trackTransaction, verifyNetwork, type PublicClient, type WaitOptions, input, WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 import { newId } from './state.js';
 import type { AgentContext } from './context.js';
 

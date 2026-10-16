@@ -1,4 +1,4 @@
-import { AgentContext, publicError } from 'agent-wallet-cli/agent';
+import { AgentContext, publicError } from '@stablechain/agent-wallet-cli/agent';
 import { loadConfig, publishConfig, stateDir } from './local';
 
 process.umask(0o077);

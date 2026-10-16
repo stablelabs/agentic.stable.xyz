@@ -22,7 +22,7 @@ it('installs packed CLI and SDK artifacts outside the repo with only production 
     }
     const viem = JSON.parse(await readFile(resolve(root, 'node_modules/viem/package.json'), 'utf8')).version;
     await writeFile(resolve(directory, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
-    await execute('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', ...tarballs, `viem@${viem}`], { cwd: directory, timeout: 120_000 });
+    await execute('npm', ['install', ...(process.env.CI ? ['--prefer-online'] : ['--offline']), '--ignore-scripts', '--no-audit', '--no-fund', ...tarballs, `viem@${viem}`], { cwd: directory, timeout: 120_000 });
     const cli = await execute(resolve(directory, 'node_modules/.bin/agent-wallet'), ['--help', '--json'], { cwd: directory });
     expect(JSON.parse(cli.stdout).data).toContain('payments resume');
     const deps = JSON.parse((await execute('npm', ['ls', '--omit=dev', '--all', '--json'], { cwd: directory })).stdout);
@@ -37,7 +37,7 @@ it('installs packed CLI and SDK artifacts outside the repo with only production 
     visit(deps);
     for (const name of ['react', 'tsx', 'typescript', 'vite', 'dotenv']) expect(installed).not.toContain(name);
     const entry = resolve(directory, 'consumer.mts');
-    await writeFile(entry, `import { createOwnerClient, type WalletConfig } from 'agent-wallet-sdk';
+    await writeFile(entry, `import { createOwnerClient, type WalletConfig } from '@stablechain/agent-wallet-sdk';
 import { createPublicClient, createWalletClient, http } from 'viem';
 export const connect = (config: WalletConfig) => createOwnerClient({ config,
   publicClient: createPublicClient({ transport: http(config.rpcUrl) }),
@@ -48,7 +48,7 @@ export const connect = (config: WalletConfig) => createOwnerClient({ config,
     const outputs = Array.isArray(bundle) ? bundle.flatMap(item => item.output) : 'output' in bundle ? bundle.output : [];
     const chunks = outputs.filter(item => item.type === 'chunk');
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks.some(chunk => chunk.type === 'chunk' && Object.keys(chunk.modules).some(path => /agent-wallet-sdk.*\/dist\/index\.js$/.test(path)))).toBe(true);
+    expect(chunks.some(chunk => chunk.type === 'chunk' && Object.keys(chunk.modules).some(path => /@stablechain\/agent-wallet-sdk.*\/dist\/index\.js$/.test(path)))).toBe(true);
     for (const chunk of chunks) if (chunk.type === 'chunk') {
       expect(chunk.code).not.toMatch(/node:fs|node:path|from ["']react["']/);
     }

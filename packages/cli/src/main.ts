@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
-import { address, identifier, validateConfig, listGrants, readBalances, readGrant, parseAmount, fundingSuggestion, paymentGasReserve, duration, input, WalletError } from 'agent-wallet-sdk/protocol';
+import { address, identifier, validateConfig, listGrants, readBalances, readGrant, parseAmount, fundingSuggestion, paymentGasReserve, duration, input, WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 import { AgentContext } from './agent/context.js';
 import { grantLink, waitGrant } from './agent/grants.js';
 import { listPayments, loadPayment, pay, paymentView, preparePayment, waitPayment } from './agent/payments.js';
@@ -50,7 +50,10 @@ try {
   const opt = parsed.values;
   asJson = Boolean(opt.json);
   if (opt.help || opt.version || parsed.positionals.length === 0) {
-    render(opt.version ? 'version' : 'help', opt.version ? '0.1.0' : help, asJson);
+    const data = opt.version
+      ? JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
+      : help;
+    render(opt.version ? 'version' : 'help', data, asJson);
   } else {
     const positions = [...parsed.positionals];
     command = positions.shift()!;
@@ -96,7 +99,7 @@ try {
             const previous = await ctx.config();
             if (previous.alice !== config.alice || previous.implementation !== config.implementation || previous.implementationCodeHash !== config.implementationCodeHash || previous.rpcUrl !== config.rpcUrl) throw new WalletError('CONFIG_IN_USE', 'Payment records bind this directory to its account and RPC. Use a separate state directory.');
           }
-          const { publicClient } = await import('agent-wallet-sdk/protocol');
+          const { publicClient } = await import('@stablechain/agent-wallet-sdk/protocol');
           await ctx.verify(publicClient(config.rpcUrl), config);
           await ctx.state.write('config.json', config);
           return config;

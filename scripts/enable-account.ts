@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { parse } from 'dotenv';
 import { encodeDeployData, keccak256, type Hex } from 'viem';
-import { walletAbi, CHAIN_ID, RPC, TOKEN, address, validateConfig, type WalletConfig, publicClient, verifyAccount, verifyImplementation, verifyNetwork } from 'agent-wallet-sdk/protocol';
+import { walletAbi, CHAIN_ID, RPC, TOKEN, address, validateConfig, type WalletConfig, publicClient, verifyAccount, verifyImplementation, verifyNetwork } from '@stablechain/agent-wallet-sdk/protocol';
 import { aliceEnvPath, configPath, exists, keyAccount, publishConfig, readJson, root, run, saveJson, signer, stateDir, submit, type Journal } from './local';
 
 await run(async () => {

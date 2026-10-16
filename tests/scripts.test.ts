@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createWalletClient, encodeFunctionData, http, keccak256, parseAbi, toHex, WaitForTransactionReceiptTimeoutError, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { chain, TOKEN, type WalletConfig, grant, publicClient, verifyAccount, walletAbi } from 'agent-wallet-sdk/protocol';
-import { createOwnerClient, type OwnerOperation } from 'agent-wallet-sdk';
-import { AgentContext, pay as agentPay, preparePayment, loadPayment, waitPayment, exists } from 'agent-wallet-cli/agent';
+import { chain, TOKEN, type WalletConfig, grant, publicClient, verifyAccount, walletAbi } from '@stablechain/agent-wallet-sdk/protocol';
+import { createOwnerClient, type OwnerOperation } from '@stablechain/agent-wallet-sdk';
+import { AgentContext, pay as agentPay, preparePayment, loadPayment, waitPayment, exists } from '@stablechain/agent-wallet-cli/agent';
 
 const binary = resolve('packages/cli/dist/main.js');
 
@@ -207,7 +207,7 @@ async function command(flags: string[], directory = resolve(dir, 'state')) {
 it('runs help and rejects invalid syntax outside the checkout without creating state', async () => {
   const fresh = resolve(dir, 'never-created');
   expect((await command(['--help'], fresh)).result.data).toContain('payments resume');
-  expect((await command(['--version'], fresh)).result.data).toBe('0.1.0');
+  expect((await command(['--version'], fresh)).result.data).toBe(JSON.parse(await readFile('packages/cli/package.json', 'utf8')).version);
   expect((await command(['pay', '--wat'], fresh)).code).toBe(2);
   expect((await command(['pay'], fresh)).result.error.code).toBe('PAYMENT_ID_REQUIRED');
   const invalid = resolve(dir, 'invalid-public-config');

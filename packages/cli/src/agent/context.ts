@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import type { Hex } from 'viem';
-import { address, validateConfig, type WalletConfig, publicClient, verifyAccount, type PublicClient, WalletError } from 'agent-wallet-sdk/protocol';
+import { address, validateConfig, type WalletConfig, publicClient, verifyAccount, type PublicClient, WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 import { StateStore } from './state.js';
 
 export class AgentContext {

@@ -1,5 +1,5 @@
 import { BaseError } from 'viem';
-import { WalletError } from 'agent-wallet-sdk/protocol';
+import { WalletError } from '@stablechain/agent-wallet-sdk/protocol';
 
 export const json = (value: unknown) => JSON.stringify(value, (_, v: unknown) => typeof v === 'bigint' ? v.toString() : v, 2);
 export function publicError(error: unknown) {

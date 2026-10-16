@@ -1,7 +1,6 @@
 {
-  "name": "agent-wallet-sdk",
+  "name": "@stablechain/agent-wallet-sdk",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "exports": {
     ".": {
@@ -24,11 +23,34 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
     "vitest": "^3.2.0",
     "viem": "^2.38.0"
-  }
+  },
+  "description": "Browser-compatible owner operations and wallet protocol for Agent Wallet on Stable Testnet.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stablelabs/agentic.stable.xyz.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/stablelabs/agentic.stable.xyz/tree/main/packages/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/stablelabs/agentic.stable.xyz/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "stablechain",
+    "agent-wallet",
+    "eip-7702",
+    "payments",
+    "testnet",
+    "sdk"
+  ]
 }

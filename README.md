@@ -67,9 +67,9 @@ The repository is an npm workspace with four separate packages:
 
 | Package | Directory | Responsibility |
 | --- | --- | --- |
-| `agent-wallet-web` | [packages/web](packages/web) | React UI that imports owner operations from `agent-wallet-sdk`. |
-| `agent-wallet-cli` | [packages/cli](packages/cli) | Agent executable and private local state; depends on the SDK protocol entry. |
-| `agent-wallet-sdk` | [packages/sdk](packages/sdk) | Owner API and shared browser-compatible wallet protocol. |
+| `agent-wallet-web` | [packages/web](packages/web) | React UI that imports owner operations from `@stablechain/agent-wallet-sdk`. |
+| `@stablechain/agent-wallet-cli` | [packages/cli](packages/cli) | Agent executable and private local state; depends on the SDK protocol entry. |
+| `@stablechain/agent-wallet-sdk` | [packages/sdk](packages/sdk) | Owner API and shared browser-compatible wallet protocol. |
 | `agent-wallet-contracts` | [packages/contracts](packages/contracts) | Solidity implementation, Foundry tests, migration fixtures, and compiled artifacts. |
 
 Each package owns its source, manifest, build, checks, and tests. Root `scripts/` contains operator tools and compatibility adapters, `tests/` contains integration and packaging checks, and `docs/` contains guides. The root package orchestrates the workspaces.
@@ -85,7 +85,7 @@ npm test
 npm run test:browser
 ```
 
-To work on one package, use `npm run build --workspace agent-wallet-sdk`, `agent-wallet-cli`, `agent-wallet-web`, or `agent-wallet-contracts`. Build the SDK before its consumers. `npm run dev:sdk` watches the SDK in a second terminal during development.
+To work on one package, use `npm run build --workspace @stablechain/agent-wallet-sdk`, `@stablechain/agent-wallet-cli`, `agent-wallet-web`, or `agent-wallet-contracts`. Build the SDK before its consumers. `npm run dev:sdk` watches the SDK in a second terminal during development.
 
 ## Use the demo or run your own
 
@@ -110,6 +110,7 @@ Open [localhost:5174](http://localhost:5174) in Chrome. Retain your keys and tra
 - [Recover a payment after a timeout](docs/wallet.md#4-recover-without-paying-twice).
 - [Run local checks and live acceptance](docs/wallet.md#checks).
 - [Deploy to Cloudflare](docs/wallet.md#deploy).
+- [Release the CLI and SDK to npm](docs/releases.md).
 - [Read the contract](packages/contracts/src/AgentWallet.sol), [shared client](packages/sdk/src/client/client.ts), or [UI](packages/web/src/App.tsx).
 
 This demo proves bounded transfers. It does not provide merchant delivery, gas sponsorship, an AI decision system, or production custody.

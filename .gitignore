@@ -12,6 +12,7 @@ packages/contracts/out/
 packages/contracts/cache/
 packages/*/dist/
 *.tgz
+.release/
 packages/web/public/wallet-config.json
 packages/web/test-results/
 playwright-report/

@@ -1,4 +1,4 @@
-import { AgentContext, pay, preparePayment, publicError, json } from 'agent-wallet-cli/agent';
+import { AgentContext, pay, preparePayment, publicError, json } from '@stablechain/agent-wallet-cli/agent';
 import { args, newId, stateDir } from './local';
 
 process.umask(0o077);

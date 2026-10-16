@@ -35,16 +35,18 @@
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "prebuild": "npm run cloudflare:types",
     "precheck": "npm run cloudflare:types",
-    "build:sdk": "npm run build --workspace agent-wallet-sdk",
-    "build:cli": "npm run build --workspace agent-wallet-cli",
+    "build:sdk": "npm run build --workspace @stablechain/agent-wallet-sdk",
+    "build:cli": "npm run build --workspace @stablechain/agent-wallet-cli",
     "build:web": "npm run build:sdk && npm run build --workspace agent-wallet-web",
-    "dev:sdk": "npm run dev --workspace agent-wallet-sdk",
+    "dev:sdk": "npm run dev --workspace @stablechain/agent-wallet-sdk",
     "prewallet:enable": "npm run build:tools",
     "prewallet:init-agent": "npm run build:tools",
     "prewallet:grant-link": "npm run build:tools",
     "prewallet:pay": "npm run build:tools",
     "prewallet:live": "npm run build:tools",
-    "build:contracts": "npm run contracts"
+    "build:contracts": "npm run contracts",
+    "release:check": "node --import tsx scripts/release.ts check",
+    "release:publish": "node --import tsx scripts/release.ts publish"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0",

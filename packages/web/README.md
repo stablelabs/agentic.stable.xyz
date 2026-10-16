@@ -1,6 +1,6 @@
 # Agent wallet web app
 
-React and Vite app for Alice's wallet. All owner operations and wallet helpers are imported from the declared `agent-wallet-sdk` dependency. The UI owns wallet connection, forms, browser storage, and presentation.
+React and Vite app for Alice's wallet. All owner operations and wallet helpers are imported from the declared `@stablechain/agent-wallet-sdk` dependency. The UI owns wallet connection, forms, browser storage, and presentation.
 
 ```sh
 npm run build:sdk

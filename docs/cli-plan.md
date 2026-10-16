@@ -51,7 +51,7 @@ Expose a role-based factory named `createOwnerClient`; Alice is the example owne
 Illustrative API, with a provisional package import name:
 
 ```ts
-import { createOwnerClient } from 'agent-wallet-sdk';
+import { createOwnerClient } from '@stablechain/agent-wallet-sdk';
 
 const owner = createOwnerClient({
   config,                    // Public account and implementation settings
@@ -332,7 +332,7 @@ Move reusable grant readers and protocol error types into `client/*` so the Alic
 
 Build a separate CLI artifact with a dedicated emitting TypeScript configuration. Use ESM with Node-compatible `.js` import specifiers, an executable shebang, and a package `bin` entry. Each package has its own build configuration; the web app uses Vite, and the CLI and SDK use separate TypeScript builds. Test the compiled executable outside the source tree with production dependencies; it must not require `tsx`, Foundry, Vite, Solidity artifacts, or Alice's environment file at runtime.
 
-The repository contains three npm workspaces: `packages/web`, `packages/cli`, and `packages/sdk`. Each owns its source, manifest, build, and tests. The web app and CLI depend on `agent-wallet-sdk` by package name; protocol code is compiled once in the SDK instead of copied into consumers. The private root package orchestrates these builds. The CLI and SDK use allowlists for packed artifacts and can be installed together from local tarballs.
+The repository contains four npm workspaces: `packages/web`, `packages/cli`, `packages/sdk`, and `packages/contracts`. Each owns its source, manifest, build, and tests. The web app and CLI depend on `@stablechain/agent-wallet-sdk` by package name; protocol code is compiled once in the SDK instead of copied into consumers. The private root package orchestrates these builds. The CLI and SDK use allowlists for packed artifacts, are prepared for public npm distribution under `@stablechain`, and can be installed together from local tarballs.
 
 ## Delivery phases and acceptance
 

@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { BaseError, InsufficientFundsError, createWalletClient, formatUnits, http, keccak256, type Hex, type TransactionRequest } from 'viem';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
-import { chain, validateConfig, type WalletConfig, trackTransaction, type PublicClient, type ReceiptCheck } from 'agent-wallet-sdk/protocol';
-import { exists, newId, readJson, saveJson, secureDir as ensureSecureDir } from 'agent-wallet-cli/agent';
+import { chain, validateConfig, type WalletConfig, trackTransaction, type PublicClient, type ReceiptCheck } from '@stablechain/agent-wallet-sdk/protocol';
+import { exists, newId, readJson, saveJson, secureDir as ensureSecureDir } from '@stablechain/agent-wallet-cli/agent';
 export { exists, newId, readJson, saveJson };
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
