@@ -14,7 +14,7 @@ For each public package, configure a GitHub Actions trusted publisher with:
 | Allowed action | `npm publish` |
 | GitHub environment | Leave empty |
 
-The workflow uses OIDC with `id-token: write`, Node 24, and npm 11.21.0. It does not require an npm publishing token or wallet keys. Creating a trusted publisher requires a maintainer's interactive npm authentication. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+The workflow uses OIDC with `id-token: write`, Node 24, npm 11.21.0, and Foundry 1.5.1. It does not require an npm publishing token or wallet keys. Creating a trusted publisher requires a maintainer's interactive npm authentication. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
 ## Check the workflow without publishing
 
@@ -33,7 +33,7 @@ npm run release:check
 npm run release:publish -- --dry-run
 ```
 
-Foundry and Chromium must be installed to run all checks. GitHub installs both. The packaging test permits registry access in CI so it also works with an empty npm cache.
+Foundry 1.5.1 and Chromium must be installed to run all checks. GitHub installs both. The packaging test permits registry access in CI so it also works with an empty npm cache.
 
 ## Prepare a version
 

@@ -43,7 +43,7 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
-          version: stable
+          version: v1.5.1
           cache: false
 
       - run: npm ci
