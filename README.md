@@ -6,10 +6,28 @@ Let a program spend from your wallet, within rules you approve.
 - **Network:** Stable Testnet. Payments use test USDT0.
 - **Status:** Proof of concept. Unaudited. No mainnet support.
 
+## Install the CLI or SDK
+
+With Node.js 22 or newer, run the published CLI without cloning the repository:
+
+```sh
+npx --yes --package=@stablechain/agent-wallet-cli@0.1.1 agent-wallet --help
+```
+
+For a persistent installation, use `npm install --global @stablechain/agent-wallet-cli@0.1.1`. Follow the [CLI guide](docs/cli.md) to create an agent signer, import public account settings, obtain Alice's approval, and submit payments. Keep the agent's state directory across runs.
+
+Applications can install the owner SDK separately:
+
+```sh
+npm install @stablechain/agent-wallet-sdk@0.1.1 viem
+```
+
+See the [SDK guide](docs/sdk.md) for owner operations and recovery. The published CLI and SDK do not require the repository's Foundry or web build tools.
+
 ## Start with the people and the money
 
 - **Alice** owns the wallet and approves permissions.
-- **The agent** is software that acts for Alice. Here, it is a local payment script; no AI model is included.
+- **The agent** is software that acts for Alice. Here, it uses the local CLI signer; no AI model is included.
 - **A signing key** is a secret used to authorize transactions. A **signature** lets the network verify the signer.
 - **A smart contract** is code the blockchain runs. This contract checks each payment before moving Alice's funds.
 
@@ -74,24 +92,30 @@ The repository is an npm workspace with four separate packages:
 
 Each package owns its source, manifest, build, checks, and tests. Root `scripts/` contains operator tools and compatibility adapters, `tests/` contains integration and packaging checks, and `docs/` contains guides. The root package orchestrates the workspaces.
 
+Run development commands from the repository root with Node.js 22+ and npm. Full checks and contract builds require [Foundry](https://getfoundry.sh/introduction/installation); use version 1.5.1 to match release CI. Browser tests also need Playwright's Chromium:
+
 ```sh
 npm ci
+npx playwright install chromium
 npm run build          # SDK, CLI, web app, and contracts; requires Foundry
 npm run build:cloudflare # Web deployment build; no Foundry required
 npm run dev            # Build SDK and start the web app
 npm run wallet -- --help
 npm run check
 npm test
+npm run test:contracts
 npm run test:browser
 ```
 
-To work on one package, use `npm run build --workspace @stablechain/agent-wallet-sdk`, `@stablechain/agent-wallet-cli`, `agent-wallet-web`, or `agent-wallet-contracts`. Build the SDK before its consumers. `npm run dev:sdk` watches the SDK in a second terminal during development.
+To work on one package, use `npm run build --workspace PACKAGE`, replacing `PACKAGE` with a name from the table. Build the SDK before its consumers. `npm run build:tools` builds the SDK and CLI; `npm run dev:sdk` watches the SDK in a second terminal during development. See [checks](docs/wallet.md#checks) for test prerequisites and a fresh-cache packaging check.
+
+Pushes to `main` deploy the web app. Matching stable version tags publish the SDK and CLI through npm trusted publishing after checks pass. Manual release workflow runs perform dry runs. See the [release guide](docs/releases.md) before preparing a version.
 
 ## Use the demo or run your own
 
 - The [hosted demo](https://agentic.stable.xyz) displays one configured Alice account. You can inspect its grants. Only Alice can manage them.
 - For your own account, follow the [setup guide](docs/wallet.md#1-set-up-alice-and-the-agent). You need Node.js 22+, Foundry, Chrome MetaMask, and test USDT0.
-- Keys stay local. Git ignores Alice's key file and the agent's keystore; see [setup](docs/wallet.md#1-set-up-alice-and-the-agent).
+- Keys stay local. Git ignores Alice's key file and the agent's state directory; see [setup](docs/wallet.md#1-set-up-alice-and-the-agent).
 - The browser uses MetaMask. Cloudflare serves the UI and public configuration; it does not run the agent or sign payments.
 
 Already set up? From the repository root:
@@ -111,6 +135,7 @@ Open [localhost:5174](http://localhost:5174) in Chrome. Retain your keys and tra
 - [Run local checks and live acceptance](docs/wallet.md#checks).
 - [Deploy to Cloudflare](docs/wallet.md#deploy).
 - [Release the CLI and SDK to npm](docs/releases.md).
+- [Read the implemented CLI and SDK design](docs/cli-plan.md).
 - [Read the contract](packages/contracts/src/AgentWallet.sol), [shared client](packages/sdk/src/client/client.ts), or [UI](packages/web/src/App.tsx).
 
 This demo proves bounded transfers. It does not provide merchant delivery, gas sponsorship, an AI decision system, or production custody.
