@@ -14,10 +14,10 @@ The release job uses Ubuntu 24.04, Node 24, npm 11.21.0, Foundry 1.5.1, and Chro
 
 ## Prepare an unpublished version
 
-Choose a new stable version for both public packages. `0.1.1` is already published; the following uses `0.1.2` as the next example. Run from the repository root, using the same shell for subsequent commands:
+Choose an unpublished stable version for both public packages. The following uses `0.1.3` as an example; replace it with your intended next version. Run from the repository root, using the same shell for subsequent commands:
 
 ```sh
-release_version=0.1.2
+release_version=0.1.3
 npm version "$release_version" --workspace packages/sdk --workspace packages/cli --no-git-tag-version
 npm pkg set "dependencies.@stablechain/agent-wallet-sdk=$release_version" --workspace packages/cli --workspace packages/web
 npm install --package-lock-only

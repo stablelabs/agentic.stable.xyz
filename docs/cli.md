@@ -7,14 +7,14 @@
 Use Node.js 22 or newer:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.1.1
+npm install --global @stablechain/agent-wallet-cli@0.1.2
 agent-wallet --help
 ```
 
 Or execute a pinned version without a global install:
 
 ```sh
-npx --yes --package=@stablechain/agent-wallet-cli@0.1.1 agent-wallet --help
+npx --yes --package=@stablechain/agent-wallet-cli@0.1.2 agent-wallet --help
 ```
 
 The installed CLI depends on the SDK and `viem`. It does not require Foundry, React, Vite, `tsx`, Alice's key file, or a checkout of this repository.

@@ -3,7 +3,7 @@
 Browser-compatible TypeScript owner operations for Agent Wallet on Stable Testnet. Create and revoke grants, estimate and fund the agent's gas, and verify transaction outcomes using injected `viem` clients. The repository's web app uses this SDK; the agent CLI consumes its shared protocol entry.
 
 ```sh
-npm install @stablechain/agent-wallet-sdk@0.1.1 viem
+npm install @stablechain/agent-wallet-sdk@0.1.2 viem
 ```
 
 `viem` is a peer dependency. The SDK includes compiled ESM JavaScript and TypeScript declarations, with no React, Node filesystem, private-key storage, or Solidity compiler dependency.

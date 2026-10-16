@@ -5,7 +5,7 @@
 ## Install
 
 ```sh
-npm install @stablechain/agent-wallet-sdk@0.1.1 viem
+npm install @stablechain/agent-wallet-sdk@0.1.2 viem
 ```
 
 The package exports ESM JavaScript and TypeScript declarations. `viem` is a peer dependency; neither the main entry nor `@stablechain/agent-wallet-sdk/protocol` imports Node filesystem APIs or React. The main entry provides `createOwnerClient`, operation types/errors, and presentation helpers. The protocol entry exposes ABIs, amount parsing, verification, grant readers, gas, and receipt helpers for lower-level consumers.
@@ -17,7 +17,7 @@ npm ci
 npm run build:sdk
 npm pack ./packages/sdk
 # In a separate application, install the generated tarball and viem.
-npm install /path/to/stablechain-agent-wallet-sdk-0.1.1.tgz viem
+npm install /path/to/stablechain-agent-wallet-sdk-0.1.2.tgz viem
 ```
 
 Packing rebuilds the SDK and does not publish it. To test both local packages together, build tools and install both generated tarballs into the consumer so its CLI resolves the matching SDK. See [releases](releases.md) before publishing.

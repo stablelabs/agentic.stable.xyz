@@ -11,15 +11,15 @@ Let a program spend from your wallet, within rules you approve.
 With Node.js 22 or newer, run the published CLI without cloning the repository:
 
 ```sh
-npx --yes --package=@stablechain/agent-wallet-cli@0.1.1 agent-wallet --help
+npx --yes --package=@stablechain/agent-wallet-cli@0.1.2 agent-wallet --help
 ```
 
-For a persistent installation, use `npm install --global @stablechain/agent-wallet-cli@0.1.1`. Follow the [CLI guide](docs/cli.md) to create an agent signer, import public account settings, obtain Alice's approval, and submit payments. Keep the agent's state directory across runs.
+For a persistent installation, use `npm install --global @stablechain/agent-wallet-cli@0.1.2`. Follow the [CLI guide](docs/cli.md) to create an agent signer, import public account settings, obtain Alice's approval, and submit payments. Keep the agent's state directory across runs.
 
 Applications can install the owner SDK separately:
 
 ```sh
-npm install @stablechain/agent-wallet-sdk@0.1.1 viem
+npm install @stablechain/agent-wallet-sdk@0.1.2 viem
 ```
 
 See the [SDK guide](docs/sdk.md) for owner operations and recovery. The published CLI and SDK do not require the repository's Foundry or web build tools.

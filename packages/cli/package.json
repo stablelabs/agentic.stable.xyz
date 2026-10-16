@@ -1,6 +1,6 @@
 {
   "name": "@stablechain/agent-wallet-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "bin": {
     "agent-wallet": "./dist/main.js"
@@ -18,7 +18,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@stablechain/agent-wallet-sdk": "0.1.1",
+    "@stablechain/agent-wallet-sdk": "0.1.2",
     "viem": "^2.38.0"
   },
   "devDependencies": {
