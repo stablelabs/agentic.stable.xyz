@@ -37,21 +37,15 @@ export function PaymentStep({ config, agent, allowance, ownerBalance, gasBalance
   let prompt = '';
   if (!issue && config && selectedAgent && selectedRecipient && paymentAmount !== undefined) {
     const settings = validateConfig({ ...config, defaultAgent: address(selectedAgent), approvalUrl: new URL(location.pathname, location.origin).href });
-    prompt = `Send exactly ${formatAmount(paymentAmount)} USDT0 to ${selectedRecipient} on Stable Testnet (chain 2201), from my wallet ${settings.alice}, using my existing agent signer ${selectedAgent} and its approved token allowance.
+    prompt = `Send exactly ${formatAmount(paymentAmount)} USDT0 to ${selectedRecipient} on Stable Testnet (chain 2201) from my wallet ${settings.alice}. This authorizes this one payment only.
 
-Read and follow the payment and recovery sections of this skill, including the linked configuration reference when needed:
+Follow the "Pay" and "Recover" sections of the agent-wallet-cli skill:
 https://raw.githubusercontent.com/stablelabs/agentic.stable.xyz/refs/heads/main/skills/agent-wallet-cli/SKILL.md
 
-Reuse the same signer state directory from setup. Verify that whoami matches ${selectedAgent}; if the original signer is unavailable, stop and ask for its location. Do not create a replacement signer or request my MetaMask private key.
+Use the signer you created during setup; whoami must return ${selectedAgent}. If you can't find it, ask me where it is. Don't create a new signer.
 
-These are my public wallet settings. If configuration is missing, save them to a local JSON file and import it into that same signer directory. If configuration already exists, verify that it matches the intended owner, token, and network; preserve any existing payment records:
-${JSON.stringify(settings, null, 2)}
-
-Check network access, the owner’s balance, current allowance, and the agent’s gas. If RPC access is blocked or funds are insufficient, stop and report what is needed without changing the recipient or amount.
-
-Check for unresolved payments before preparing a new payment. Record one payment ID for this request, simulate it, then submit and verify that same payment. Recover any uncertain outcome using the original ID instead of creating another payment. This instruction authorizes this one payment only.
-
-Report the recipient, amount, payment ID, confirmed or pending status, transaction explorer link when available, and remaining allowance. Claim completion only after verifying the onchain receipt.`;
+If that signer isn't configured yet, import these settings. If it's configured for a different owner, stop and tell me.
+${JSON.stringify(settings, null, 2)}`;
   }
   const copied = !!prompt && copiedPrompt === prompt;
   const copyFailed = !!prompt && failedPrompt === prompt;

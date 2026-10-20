@@ -324,8 +324,8 @@ test('copies an exact payment request after approval and gas funding without sen
   await expect(page.getByRole('button', { name: 'Payment prompt copied' })).toBeVisible();
   let prompt = await page.evaluate(() => navigator.clipboard.readText());
   expect(prompt).toContain(`Send exactly 0.001 USDT0 to ${recipient}`);
-  expect(prompt).toContain(`from my wallet ${other}`);
-  expect(prompt).toContain(`existing agent signer ${agent}`);
+  expect(prompt).toContain(`from my wallet ${other}.`);
+  expect(prompt).toContain(`whoami must return ${agent}`);
   expect(prompt).not.toContain(alice);
   const settings = JSON.parse(prompt.match(/\{[\s\S]*?\n\}/)![0]);
   expect(settings).toEqual({ ...config, alice: other, approvalUrl: new URL('/', page.url()).href });
