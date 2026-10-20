@@ -253,7 +253,7 @@ test('disconnect clears wallet details and disables spending until reconnection'
   await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
 });
 
-test('copies public setup settings for the connected visitor and resets after an account change', async ({ page, context }) => {
+test('copies the signer setup prompt for the connected visitor and resets after an account change', async ({ page, context }) => {
   const submissions = await fixture(page, { account: other, noDefaultAgent: true });
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
@@ -266,10 +266,13 @@ test('copies public setup settings for the connected visitor and resets after an
   await expect(page.getByRole('button', { name: 'Setup prompt copied' })).toBeVisible();
   const prompt = await page.evaluate(() => navigator.clipboard.readText());
   expect(prompt).toContain('https://raw.githubusercontent.com/stablelabs/agentic.stable.xyz/refs/heads/main/skills/agent-wallet-cli/SKILL.md');
-  expect(prompt).toContain(`"alice": "${other}"`);
+  expect(prompt).toContain(other);
   expect(prompt).not.toContain(alice);
   expect(prompt).not.toContain('defaultAgent');
-  expect(prompt).toContain(`"approvalUrl": "${new URL('/', page.url()).href}"`);
+  const approvalLink = new URL('/', page.url());
+  approvalLink.searchParams.set('agent', 'AGENT_SIGNER_ADDRESS');
+  approvalLink.searchParams.set('amount', '0.025');
+  expect(prompt).toContain(approvalLink.href);
   expect(prompt).toContain('requesting 0.025 USDT0 allowance');
   expect(prompt).toContain('Stop before making any payment.');
   expect(submissions).toHaveLength(0);
@@ -280,7 +283,7 @@ test('copies public setup settings for the connected visitor and resets after an
   await copy.click();
   await expect(page.getByRole('button', { name: 'Setup prompt copied' })).toBeVisible();
   const nextPrompt = await page.evaluate(() => navigator.clipboard.readText());
-  expect(nextPrompt).toContain(`"alice": "${alice}"`);
+  expect(nextPrompt).toContain(alice);
   expect(nextPrompt).not.toContain(other);
 });
 

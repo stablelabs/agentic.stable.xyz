@@ -21,7 +21,7 @@ Apply this with the same absolute `STATE_DIR` and original `PAYMENT_ID` establis
 
 | Code | Action |
 | --- | --- |
-| `CONFIG_REQUIRED` | Run `whoami` with the intended directory. Import verified public settings into that same directory. Do not initialize another signer. |
+| `CONFIG_REQUIRED` | For setup-only, use `whoami` and construct the approval URL locally from the supplied page and amount; imported settings are not required. For onchain tasks, import verified public settings into the intended directory. Do not initialize another signer. |
 | `AGENT_REQUIRED` / `STATE_REQUIRED` | Locate the original state when recovering an existing signer. Initialize only if a new signer is actually intended. |
 | `INVALID_KEY_RECORD` / `UNSAFE_STATE` / `INVALID_PAYMENT_JOURNAL` | Preserve the directory and stop mutation. Diagnose identity/permissions using public diagnostics; never repair by fabricating journal fields or replacing the key. |
 | `CONFIG_IN_USE` | Existing journals bind owner/token/RPC. Recover them under their original settings. Do not overwrite config or delete records to switch owners. |

@@ -7,7 +7,9 @@ description: "Install and operate @stablechain/agent-wallet-cli for Stable Testn
 
 Use `agent-wallet` to spend an owner's test USDT0 through an approved agent signer. This skill works with any agent that can read Markdown and run shell commands. Codex metadata in `agents/openai.yaml` is optional for other runtimes.
 
-## Install and establish identity
+## Local signer setup — no RPC required
+
+For a setup-only request, install the CLI if needed, create or reuse a signer, and return its public address and the supplied approval link with that address filled in. Stop there. Key creation and address discovery are local operations. Do not require public configuration, RPC access, allowance, gas, or payment readiness to complete signer setup. Do not run `config import`, `doctor`, `status`, or onchain checks for this phase. Read the payment sections and configuration reference only when the task calls for those operations.
 
 Require Node.js 22+. Install the standalone package:
 
@@ -21,17 +23,22 @@ The package bundles its runtime and needs no build or checkout. For a supplied r
 
 Resolve one **absolute, persistent state directory** for the intended signer. Prefer the user's explicit path, then existing `WALLET_STATE_DIR`, then an identified existing `.agent-wallet-erc20` directory. Resolve relative paths from the working directory that originally used them. When upgrading from the repository runner, keep its original absolute state path. Changing directories or installing the package must not create another identity.
 
-If no identity is identifiable and an existing approved signer is expected, ask for its directory instead of generating a replacement. For a genuinely new signer, choose a durable location such as `$HOME/.agent-wallet-erc20`. Set `STATE_DIR` to the selected absolute path; the examples below require it. Always supply `--state-dir "$STATE_DIR"` explicitly. Inspect identity and settings:
+If no identity is identifiable and an existing approved signer is expected, ask for its directory instead of generating a replacement. For a genuinely new signer, choose a persistent location such as `$HOME/.agent-wallet-erc20` when the environment supports persistent storage. Do not promise a chat workspace's files survive across sessions. Set `STATE_DIR` to the selected absolute path; the examples below require it. Always supply `--state-dir "$STATE_DIR"` explicitly. Inspect identity:
 
 ```sh
 agent-wallet --help --json
 agent-wallet whoami --state-dir "$STATE_DIR" --json
-agent-wallet config show --state-dir "$STATE_DIR" --json
 ```
 
-Match the returned address to the intended approved spender. `defaultAgent` in public configuration is only a browser prefill; the stored signer determines CLI identity. `whoami` shows public identity; `doctor` also verifies the key and journal consistency.
+Once the intended state directory is established, run `init --state-dir "$STATE_DIR" --json`, then `whoami --state-dir "$STATE_DIR" --json` and record its public address. `init` creates a key for a genuinely new signer or verifies and retains an existing key; both paths are local. Do not use a fresh directory or key to fix a configuration or transaction error. Match the returned address to the intended approved spender. `defaultAgent` in public configuration is only a browser prefill; the stored signer determines CLI identity.
 
-Import operator-provided **public** settings when missing:
+Return the public address and construct the approval URL locally using the supplied approval page and allowance. If the prompt supplies a URL template, replace only its agent-address placeholder with the exact `whoami` address. Otherwise use the standard URL API to set `agent` and `amount` query parameters, preserving the supplied page and amount. For example: `https://agentic.stable.xyz/?agent=AGENT_ADDRESS&amount=0.01`, with the actual address and requested amount substituted. This performs no RPC call and needs no imported configuration. Do not write a fabricated `config.json` into the private state directory just to enable `allowance link`.
+
+The owner reviews and approves through MetaMask on that page, where the browser performs its own network checks. An approval link does not imply the agent has checked allowance or can submit payments. If network access is known to be restricted, mention that it will be needed for later onchain operations while still completing local signer setup. A setup-only request does not authorize a payment.
+
+## Configure for onchain operations
+
+When the user requests balance/allowance checks or an authorized payment, import operator-provided **public** settings if missing:
 
 ```sh
 agent-wallet config import --file "$CONFIG_FILE" --state-dir "$STATE_DIR" --json
@@ -39,16 +46,16 @@ agent-wallet config import --file "$CONFIG_FILE" --state-dir "$STATE_DIR" --json
 
 Set `CONFIG_FILE` to an operator-provided public JSON file. Check the owner (`alice` is its legacy field name), token, network, and approval URL against the user's intended setup. If settings do not exist, create the public schema described in [configuration reference](references/configuration.md) using the actual owner and approval page. Do not silently use a sample or deployment owner. Config import verifies chain/token and does not grant spending permission.
 
-For a new setup, complete this network check **before creating a signer**. A hosted chat workspace may allow GitHub/npm while blocking the configured RPC. If import fails because network access is denied, report the blocked RPC hostname and stop setup. The workspace needs permission to reach that RPC, or the user needs an agent environment with that access. Do not change RPCs to work around an access policy, create another signer, or ask the owner to approve/fund a signer that cannot operate. Keep any existing signer and state intact. Do not promise a chat workspace's files will persist across sessions; use storage whose persistence the environment actually supports.
+These operations need RPC access. If import fails because the environment blocks the configured RPC, report the hostname and stop the onchain operation. Preserve the existing signer and state. Do not change RPCs to work around an access policy or create another signer. Network restrictions do not invalidate the local signer setup or prevent constructing its approval link.
 
-After network verification succeeds, for a genuinely new signer run `init --state-dir "$STATE_DIR" --json`, then record its public address. `init` retains an existing key. Do not use a fresh directory or key to fix a configuration or transaction error. For both new and existing configured signers, verify readiness before returning the approval link:
+After configuration, inspect diagnostics and balances as needed for the requested onchain task:
 
 ```sh
 agent-wallet doctor --state-dir "$STATE_DIR" --json
 agent-wallet status --state-dir "$STATE_DIR" --json
 ```
 
-If network readiness is blocked, report that blocker instead of presenting setup as complete. `allowance link` constructs a URL locally from imported settings; a link is not proof that this environment can read the chain or make a payment.
+`doctor` verifies the key, journals, and network; it is not a local setup prerequisite. `allowance link` constructs a URL locally from imported settings. The setup-only URL construction above works before import and does not require skipping any transaction verification.
 
 This CLI supports **Stable Testnet, chain 2201**, and USDT0 at `0x78Cf24370174180738C5B8E352B6D14c83a6c9A9`. Token amounts have **6 decimals**; native gas amounts have **18 decimals**. Never round a payment to make it fit. Use decimal strings and integer arithmetic for atomic amounts, not floating point.
 
