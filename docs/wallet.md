@@ -31,11 +31,11 @@ Standalone CLI users obtain public JSON from the operator or create it with the 
 }
 ```
 
-Replace `OWNER_ADDRESS`; the approval page must use the same owner. Import with `agent-wallet config import --file /absolute/path/wallet-config.json --json` using the same state directory as `init`. Configuration does not approve allowance or transfer funds.
+Replace `OWNER_ADDRESS` with the account you connect in MetaMask. The web app accepts any visitor’s MetaMask account and uses it as the wallet owner for balances, approvals, revocations, and gas funding. It adds or switches to Stable Testnet during connection. You can also connect and use **Download wallet settings** to get public JSON containing your account and the selected agent address. Import with `agent-wallet config import --file /absolute/path/wallet-config.json --json` using the same state directory as `init`. Configuration does not approve allowance or transfer funds.
 
 For web-app operators with a checkout, `npm run wallet:configure -- --owner ADDRESS --agent ADDRESS` verifies the public network/token and writes `web/public/wallet-config.json`. Options include `--rpc URL`, `--approval-url URL`, and `--output FILE`.
 
-Development serves that generated public file. Production builds validate and copy `web/deployment/wallet-config.json` to `web/dist/wallet-config.json`; local settings never replace production settings automatically. The production configuration leaves the agent blank so an owner can paste a signer or use its CLI approval link. Neither public file contains signing keys or transaction journals.
+Development serves that generated public file. Production builds validate and copy `web/deployment/wallet-config.json` to `web/dist/wallet-config.json`; local settings never replace production settings automatically. The deployment file’s `alice` remains a schema-compatible bootstrap value; the browser replaces it with the connected account before reading balances or submitting transactions. The production configuration leaves the agent blank so an owner can paste a signer or use its CLI approval link. Neither public file contains signing keys or transaction journals.
 
 ## Approvals and gas
 
@@ -55,7 +55,7 @@ Before signing, the CLI checks allowance, owner balance, gas, and token simulati
 
 A timeout means the outcome is unknown. `payments show ID` and `payments wait ID` never broadcast. `payments resume ID` checks for a receipt before reusing the same signed bytes. Do not prepare another ID for an uncertain payment: IDs are local records, and a new transaction can spend again. Retain original state through retries. Another signed payment from the same signer blocks new signing until reconciled.
 
-The browser retains approval/funding descriptors in its existing schema-2 local-storage namespace. Unverified operations block further submissions across reloads. Use **Check confirmation**, or obtain the hash from MetaMask and use **Verify transaction**. Do not clear browser storage to resolve an unknown outcome. If no hash was returned, inspect wallet history and retain the record while investigating. Corrupt or inaccessible saved state blocks new submissions.
+The browser retains approval/funding descriptors in its existing schema-2 local-storage namespace, separately for each owner and token. Reconnect MetaMask after a reload to restore that owner’s records. Unverified operations block further submissions for that owner across reloads and account switches. Changing accounts or networks, wallet disconnection, and the app’s **Disconnect** button disable wallet actions and clear the displayed account data; reconnect to continue. Disconnecting the app leaves recovery records and onchain allowances intact. Use **Check confirmation**, or obtain the hash from MetaMask and use **Verify transaction**. Do not clear browser storage to resolve an unknown outcome. If no hash was returned, inspect wallet history and retain the record while investigating. Corrupt or inaccessible saved state blocks new submissions for that owner.
 
 ## Verified testnet example
 

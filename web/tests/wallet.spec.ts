@@ -8,9 +8,11 @@ const rpcUrl = 'https://rpc.agent-wallet.invalid';
 const blockHash = keccak256('0x03');
 const config = { schemaVersion: 2, chainId: 2201, rpcUrl, token: TOKEN, alice, approvalUrl: 'http://127.0.0.1:5174', defaultAgent: agent };
 const block = { number: '0x64', hash: blockHash, parentHash: blockHash, timestamp: toHex(1791936000), baseFeePerGas: '0x3b9aca00', gasLimit: '0x1c9c380', gasUsed: '0x5208', miner: alice, difficulty: '0x0', totalDifficulty: '0x0', nonce: '0x0000000000000000', extraData: '0x', logsBloom: `0x${'00'.repeat(256)}`, transactions: [], size: '0x100' };
-type Tx = { to: string; data?: Hex; value?: Hex };
-async function fixture(page: Page, options: { allowance?: bigint; wrongAccount?: boolean; reject?: boolean; unknown?: boolean; mismatch?: boolean; reverted?: boolean; missingEvent?: boolean; rpcDown?: boolean; noDefaultAgent?: boolean } = {}) {
-  let allowance = options.allowance ?? 0n; let gas = 0n;
+type Tx = { from: string; to: string; data?: Hex; value?: Hex };
+async function fixture(page: Page, options: { allowance?: bigint; account?: string; reject?: boolean; unknown?: boolean; mismatch?: boolean; reverted?: boolean; missingEvent?: boolean; rpcDown?: boolean; noDefaultAgent?: boolean; discovery?: boolean; missingWallet?: boolean; rejectConnect?: boolean; emptyAccounts?: boolean; unknownChain?: boolean; rejectSwitch?: boolean } = {}) {
+  const walletOwner = options.account || alice;
+  const { allowance: initialAllowance, ...walletOptions } = options;
+  const allowances = new Map([[walletOwner, initialAllowance ?? 0n]]); let gas = 0n;
   const submissions: Tx[] = []; const transactions = new Map<Hex, Tx>(); const logs = new Map<Hex, any[]>();
   await page.route('**/wallet-config.json', route => route.fulfill({ json: {...config, defaultAgent: options.noDefaultAgent ? undefined : agent} }));
   await page.route(`${rpcUrl}/`, async route => {
@@ -27,13 +29,13 @@ async function fixture(page: Page, options: { allowance?: bigint; wrongAccount?:
       }
       if (method === 'eth_getTransactionByHash') {
         const tx = transactions.get(params[0]);
-        return { hash: params[0], blockHash, blockNumber: '0x64', from: alice, to: options.mismatch ? other : tx?.to, nonce: '0x0', gas: '0x10000', gasPrice: '0x1', value: tx?.value || '0x0', input: tx?.data || '0x', type: '0x2', chainId: '0x899', transactionIndex: '0x0', v: '0x0', r: '0x1', s: '0x1' };
+        return { hash: params[0], blockHash, blockNumber: '0x64', from: tx?.from, to: options.mismatch ? other : tx?.to, nonce: '0x0', gas: '0x10000', gasPrice: '0x1', value: tx?.value || '0x0', input: tx?.data || '0x', type: '0x2', chainId: '0x899', transactionIndex: '0x0', v: '0x0', r: '0x1', s: '0x1' };
       }
-      if (method === 'eth_getTransactionReceipt') return { transactionHash: params[0], blockHash, blockNumber: '0x64', from: alice, to: transactions.get(params[0])?.to, contractAddress: null, cumulativeGasUsed: '0x5208', gasUsed: '0x5208', effectiveGasPrice: '0x1', status: options.reverted ? '0x0' : '0x1', transactionIndex: '0x0', type: '0x2', logs: logs.get(params[0]) || [], logsBloom: `0x${'00'.repeat(256)}` };
+      if (method === 'eth_getTransactionReceipt') return { transactionHash: params[0], blockHash, blockNumber: '0x64', from: transactions.get(params[0])?.from, to: transactions.get(params[0])?.to, contractAddress: null, cumulativeGasUsed: '0x5208', gasUsed: '0x5208', effectiveGasPrice: '0x1', status: options.reverted ? '0x0' : '0x1', transactionIndex: '0x0', type: '0x2', logs: logs.get(params[0]) || [], logsBloom: `0x${'00'.repeat(256)}` };
       if (method === 'eth_call') {
         if (params[0].to.toLowerCase() !== TOKEN.toLowerCase()) throw new Error('Only token calls are supported');
         const decoded = decodeFunctionData({ abi: tokenAbi, data: params[0].data });
-        const values: any = { decimals: 6, symbol: 'USDT0', balanceOf: 1_000_000n, allowance, approve: true };
+        const values: any = { decimals: 6, symbol: 'USDT0', balanceOf: 1_000_000n, allowance: decoded.functionName === 'allowance' ? allowances.get(decoded.args[0].toLowerCase()) ?? 0n : 0n, approve: true };
         return encodeFunctionResult({ abi: tokenAbi, functionName: decoded.functionName, result: values[decoded.functionName] } as never);
       }
       throw new Error(`Unexpected RPC method ${method}`);
@@ -42,29 +44,46 @@ async function fixture(page: Page, options: { allowance?: bigint; wrongAccount?:
     await route.fulfill({ json: Array.isArray(body) ? body.map(response) : response(body) });
   });
   await page.exposeFunction('walletTestSubmit', (tx: Tx) => {
+    expect(tx.from.toLowerCase()).toBe(walletOwner);
     submissions.push(tx); const hash = keccak256(toHex(submissions.length)); transactions.set(hash, tx);
     if (tx.to.toLowerCase() === agent) { if (!options.reverted) gas += BigInt(tx.value!); return hash; }
     expect(tx.to.toLowerCase()).toBe(TOKEN.toLowerCase());
     const decoded = decodeFunctionData({ abi: tokenAbi, data: tx.data! }); expect(decoded.functionName).toBe('approve');
     const [spender, value] = decoded.args as [Hex, bigint]; expect(spender).toBe(agent);
-    if (!options.reverted) allowance = value;
-    logs.set(hash, options.missingEvent ? [] : [{ address: TOKEN, topics: encodeEventTopics({ abi: tokenAbi, eventName: 'Approval', args: { owner: alice, spender: agent } }), data: encodeAbiParameters([{ type: 'uint256' }], [value]), blockHash, blockNumber: '0x64', transactionHash: hash, transactionIndex: '0x0', logIndex: '0x0', removed: false }]);
+    if (!options.reverted) allowances.set(tx.from.toLowerCase(), value);
+    logs.set(hash, options.missingEvent ? [] : [{ address: TOKEN, topics: encodeEventTopics({ abi: tokenAbi, eventName: 'Approval', args: { owner: tx.from as Hex, spender: agent } }), data: encodeAbiParameters([{ type: 'uint256' }], [value]), blockHash, blockNumber: '0x64', transactionHash: hash, transactionIndex: '0x0', logIndex: '0x0', removed: false }]);
     return hash;
   });
-  await page.addInitScript(({ account, reject, unknown }) => {
+  await page.addInitScript(({ account, options }) => {
+    if (options.missingWallet) return;
     const listeners: Record<string, (() => void)[]> = {};
-    (window as any).ethereum = { isMetaMask: true, request: async ({ method, params }: any) => {
-      if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [account];
-      if (method === 'eth_chainId') return '0x899'; if (method === 'wallet_switchEthereumChain') return null;
+    let chainId = options.unknownChain ? '0x1' : '0x899'; let added = !options.unknownChain;
+    (window as any).walletTestRequests = [];
+    const provider = { isMetaMask: true, request: async ({ method, params }: any) => {
+      (window as any).walletTestRequests.push({ method, params });
+      if (method === 'eth_requestAccounts' && options.rejectConnect) throw Object.assign(new Error('Connection rejected'), { code: 4001 });
+      if (method === 'eth_requestAccounts' || method === 'eth_accounts') return options.emptyAccounts ? [] : [account];
+      if (method === 'eth_chainId') return chainId;
+      if (method === 'wallet_switchEthereumChain') {
+        if (options.rejectSwitch) throw Object.assign(new Error('Network switch rejected'), { code: 4001 });
+        if (!added) throw Object.assign(new Error('Unknown chain'), { code: 4902 });
+        chainId = params[0].chainId; listeners.chainChanged?.forEach(fn => fn()); return null;
+      }
+      if (method === 'wallet_addEthereumChain') { added = true; return null; }
       if (method === 'eth_sendTransaction') {
-        if (reject) throw Object.assign(new Error('Rejected'), { code: 4001 });
+        if (options.reject) throw Object.assign(new Error('Rejected'), { code: 4001 });
         const hash = await (window as any).walletTestSubmit(params[0]);
-        if (unknown) throw new Error('Lost wallet response'); return hash;
+        if (options.unknown) throw new Error('Lost wallet response'); return hash;
       }
       throw new Error(`Unexpected wallet method ${method}`);
-    }, on: (name: string, fn: () => void) => { (listeners[name] ||= []).push(fn); }, removeListener: () => {} };
-    (window as any).walletTestSwitch = () => listeners.accountsChanged?.forEach(fn => fn());
-  }, { account: options.wrongAccount ? agent : alice, reject: !!options.reject, unknown: !!options.unknown });
+    }, on: (name: string, fn: () => void) => { (listeners[name] ||= []).push(fn); }, removeListener: (name: string, fn: () => void) => { listeners[name] = listeners[name]?.filter(listener => listener !== fn); } };
+    if (options.discovery) {
+      (window as any).ethereum = { isMetaMask: true, isRabby: true, request: () => { throw new Error('Wrong wallet selected'); } };
+      window.addEventListener('eip6963:requestProvider', () => window.dispatchEvent(new CustomEvent('eip6963:announceProvider', { detail: { info: { rdns: 'io.metamask' }, provider } })));
+    } else (window as any).ethereum = provider;
+    (window as any).walletTestSwitch = (next?: string) => { if (next) account = next; listeners.accountsChanged?.forEach(fn => fn()); };
+    (window as any).walletTestDisconnect = () => listeners.disconnect?.forEach(fn => fn());
+  }, { account: walletOwner, options: walletOptions });
   return submissions;
 }
 async function connect(page: Page) { await page.goto('/'); await page.getByRole('button', { name: 'Connect MetaMask' }).click(); await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible(); }
@@ -86,9 +105,12 @@ test('requires a confirmed zero reset before setting another positive amount', a
   await page.getByLabel('Allowance amount (USDT0)').fill('0.02'); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
   await expect(page.getByText('Remaining token allowance:')).toContainText('0.02 USDT0'); expect(submissions).toHaveLength(2);
 });
-test('rejects the wrong owner and invalidates authority on account changes', async ({ page }) => {
-  await fixture(page, { wrongAccount: true }); await page.goto('/'); await page.getByRole('button', { name: 'Connect MetaMask' }).click();
-  await expect(page.getByRole('alert')).toContainText('Select the configured owner'); await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+test('connects a visitor wallet and approves from it instead of the configured owner', async ({ page }) => {
+  const submissions = await fixture(page, { account: other }); await connect(page);
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText(other);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  expect(submissions[0].from).toBe(other);
 });
 test('requires reconnecting after the connected account changes', async ({ page }) => {
   await fixture(page); await connect(page); await page.evaluate(() => (window as any).walletTestSwitch());
@@ -111,6 +133,7 @@ test('funds agent gas separately without changing the token allowance', async ({
 test('preserves unknown approval across reload and verifies a recovered hash before another submission', async ({ page }) => {
   const submissions = await fixture(page, { unknown: true }); await connect(page); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('outcome is unknown'); await page.reload();
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
   await expect(page.getByRole('region', { name: 'Pending operation' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Fund agent gas' })).toBeDisabled();
   await page.getByLabel('Transaction hash from MetaMask').fill(keccak256(toHex(1))); await page.getByRole('button', { name: 'Verify transaction' }).click();
   await expect(page.getByRole('status')).toContainText('Agent approval confirmed'); expect(submissions).toHaveLength(1);
@@ -161,4 +184,71 @@ test('invites a signer address without showing an error when no agent is presele
   await expect(page.getByLabel('Agent signer', {exact: true})).toHaveValue('');
   await expect(page.getByText('Remaining token allowance:')).toContainText('Enter an agent address');
   await expect(page.getByRole('region', {name: 'Send an agent payment'})).toContainText('agent-wallet payments prepare');
+});
+
+test('selects MetaMask through EIP-6963 when another wallet owns window.ethereum', async ({ page }) => {
+  const submissions = await fixture(page, { discovery: true }); await connect(page);
+  expect(submissions).toHaveLength(0);
+  expect(await page.evaluate(() => (window as any).walletTestRequests.some((r: any) => r.method === 'eth_sendTransaction'))).toBe(false);
+});
+
+test('adds Stable Testnet and switches before enabling wallet actions', async ({ page }) => {
+  await fixture(page, { unknownChain: true }); await connect(page);
+  const requests = await page.evaluate(() => (window as any).walletTestRequests);
+  expect(requests.find((r: any) => r.method === 'wallet_addEthereumChain').params[0]).toMatchObject({ chainId: '0x899', chainName: 'Stable Testnet', rpcUrls: [rpcUrl], nativeCurrency: { symbol: 'USDT0', decimals: 18 } });
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+});
+
+for (const scenario of [
+  { name: 'missing MetaMask', options: { missingWallet: true }, message: 'MetaMask was not found' },
+  { name: 'rejected connection', options: { rejectConnect: true }, message: 'Connection rejected' },
+  { name: 'no shared account', options: { emptyAccounts: true }, message: 'No account was shared' },
+  { name: 'rejected network switch', options: { rejectSwitch: true }, message: 'Network switch rejected' },
+]) {
+  test(`handles ${scenario.name} without enabling transactions`, async ({ page }) => {
+    const submissions = await fixture(page, scenario.options); await page.goto('/');
+    await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+    await expect(page.getByRole('alert')).toContainText(scenario.message);
+    await expect(page.getByRole('button', { name: 'Connect MetaMask' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+    expect(submissions).toHaveLength(0);
+  });
+}
+
+test('downloads CLI settings for the connected visitor and selected signer', async ({ page }) => {
+  await fixture(page, { account: other }); await connect(page);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download wallet settings' }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual({ ...config, alice: other });
+});
+
+test('keeps pending operations with their owner across account switches and reconnects', async ({ page }) => {
+  await fixture(page, { unknown: true }); await connect(page);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Pending operation' })).toBeVisible();
+  await page.evaluate(other => (window as any).walletTestSwitch(other), other);
+  await expect(page.getByRole('region', { name: 'Pending operation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText(other);
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+  await page.evaluate(alice => (window as any).walletTestSwitch(alice), alice);
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('region', { name: 'Pending operation' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Fund agent gas' })).toBeDisabled();
+});
+
+test('disconnect clears wallet details and disables spending until reconnection', async ({ page }) => {
+  await fixture(page); await connect(page);
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).not.toContainText(alice);
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Download wallet settings' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  await page.evaluate(() => (window as any).walletTestDisconnect());
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
 });

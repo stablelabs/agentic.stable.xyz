@@ -8,6 +8,8 @@ const operationKey = (config: WalletConfig) => `stable-token-allowance:v2:${conf
 const unresolved = (op?: OwnerOperation) => !!op && ['prepared', 'submitted', 'unknown'].includes(op.status);
 export default function App() {
   const refreshId = useRef(0);
+  const activeOwner = useRef<string | undefined>(undefined);
+  const connectionId = useRef(0);
   const [config, setConfig] = useState<WalletConfig>();
   const [storageError, setStorageError] = useState('');
   const [storageReady, setStorageReady] = useState(false);
@@ -34,26 +36,33 @@ export default function App() {
       if (!response.ok) throw new Error('Public wallet settings are missing. Run npm run wallet:configure -- --owner ADDRESS.');
       const c = validateConfig(await response.json()); setConfig(c);
       setAgent(new URLSearchParams(location.search).get('agent') || c.defaultAgent || '');
-      try {
-        const saved = JSON.parse(localStorage.getItem(operationKey(c)) || 'null') as OwnerOperation | null;
-        if (saved) {
-          if (saved.schemaVersion !== 2 || saved.alice.toLowerCase() !== c.alice.toLowerCase() || saved.token.toLowerCase() !== c.token.toLowerCase() || !['approve', 'fund'].includes(saved.action) || !['prepared', 'submitted', 'confirmed', 'reverted', 'rejected', 'unknown'].includes(saved.status) || !saved.intent || !/^(0|[1-9]\d*)$/.test(saved.intent.amount)) throw new Error('Invalid saved operation');
-          address(saved.intent.agent); identifier(saved.operationId);
-          if (saved.hash) identifier(saved.hash);
-          setOperation(saved);
-          if (unresolved(saved)) setAgent(saved.intent.agent);
-          if (unresolved(saved)) setNotice('A previous wallet operation is unverified. Check its confirmation before another approval or gas transfer.');
-        }
-        setStorageReady(true);
-      } catch { setStorageError('Cannot read saved wallet operations. Restore access to browser storage before submitting.'); }
     }).catch(e => setError(failure(e)));
   }, []);
+  useEffect(() => {
+    setOperation(undefined); setRecoveredHash(''); setStorageReady(false); setStorageError('');
+    if (!config || !account) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(operationKey(config)) || 'null') as OwnerOperation | null;
+      if (saved) {
+        if (saved.schemaVersion !== 2 || saved.chainId !== CHAIN_ID || saved.alice.toLowerCase() !== config.alice.toLowerCase() || saved.token.toLowerCase() !== config.token.toLowerCase() || !['approve', 'fund'].includes(saved.action) || !['prepared', 'submitted', 'confirmed', 'reverted', 'rejected', 'unknown'].includes(saved.status) || !saved.intent || !/^(0|[1-9]\d*)$/.test(saved.intent.amount)) throw new Error('Invalid saved operation');
+        address(saved.intent.agent); identifier(saved.operationId);
+        if (saved.hash) identifier(saved.hash);
+        setOperation(saved);
+        if (unresolved(saved)) setAgent(saved.intent.agent);
+        if (unresolved(saved)) setNotice('A previous wallet operation is unverified. Check its confirmation before another approval or gas transfer.');
+      }
+      setStorageReady(true);
+    } catch { setStorageError('Cannot read saved wallet operations. Restore access to browser storage before submitting.'); }
+  }, [config, account]);
   const refresh = useCallback(async () => {
     if (!config) return;
+    if (account?.toLowerCase() !== activeOwner.current) return;
     const requestId = ++refreshId.current;
     try {
       const owner = createOwnerClient({ config, publicClient: publicClient(config.rpcUrl) });
       await owner.verifyNetwork();
+      if (requestId !== refreshId.current) return;
+      if (!account) { setVerified(true); setNetworkError(''); return; }
       if (!agent.trim()) {
         const balances = await owner.getBalances();
         if (requestId !== refreshId.current) return;
@@ -64,7 +73,7 @@ export default function App() {
       if (requestId !== refreshId.current) return;
       setVerified(true); setAllowance(remaining); setOwnerBalance(balances.aliceToken); setGasBalance(balances.agentNative); setNetworkError('');
     } catch (e) { if (requestId !== refreshId.current) return; setVerified(false); setAllowance(undefined); setGasBalance(undefined); setNetworkError(failure(e)); }
-  }, [config, agent]);
+  }, [config, agent, account]);
   useEffect(() => {
     setVerified(false); setAllowance(undefined); setGasBalance(undefined);
     let alive = true;
@@ -74,22 +83,30 @@ export default function App() {
   }, [refresh]);
   useEffect(() => {
     if (!provider) return;
-    const invalidate = () => { setAccount(undefined); setNotice('Wallet account or network changed. Reconnect the wallet owner.'); };
-    provider.on?.('accountsChanged', invalidate); provider.on?.('chainChanged', invalidate);
-    return () => { provider.removeListener?.('accountsChanged', invalidate); provider.removeListener?.('chainChanged', invalidate); };
+    const invalidate = () => { disconnect(); setNotice('Wallet account or network changed. Reconnect MetaMask to continue.'); };
+    provider.on?.('accountsChanged', invalidate); provider.on?.('chainChanged', invalidate); provider.on?.('disconnect', invalidate);
+    return () => { provider.removeListener?.('accountsChanged', invalidate); provider.removeListener?.('chainChanged', invalidate); provider.removeListener?.('disconnect', invalidate); };
   }, [provider]);
+  function disconnect() {
+    connectionId.current++; refreshId.current++; activeOwner.current = undefined;
+    setAccount(undefined); setVerified(false); setOwnerBalance(undefined); setAllowance(undefined); setGasBalance(undefined);
+    setOperation(undefined); setRecoveredHash(''); setStorageReady(false); setStorageError(''); setError(''); setNetworkError(''); setNotice('');
+  }
   function ownerActions(wallet?: ReturnType<typeof createWalletClient>) {
+    const revision = connectionId.current;
     return createOwnerClient({ config: config!, publicClient: publicClient(config!.rpcUrl), walletClient: wallet,
-      onOperation: op => { localStorage.setItem(operationKey(config!), JSON.stringify(op)); setOperation(op); },
+      onOperation: op => { localStorage.setItem(operationKey(config!), JSON.stringify(op)); if (revision === connectionId.current && activeOwner.current === op.alice.toLowerCase()) setOperation(op); },
     });
   }
   async function connect() {
     if (!config) return;
-    setBusy(true); setError('');
+    disconnect(); setBusy(true);
     try {
       const p = await metaMask(); setProvider(p);
       const accounts = await p.request({ method: 'eth_requestAccounts' });
-      if (accounts[0]?.toLowerCase() !== config.alice.toLowerCase()) throw new Error(`Select the configured owner account in MetaMask: ${config.alice}`);
+      if (!accounts[0]) throw new Error('No account was shared. Unlock MetaMask and select an account to connect.');
+      const selected = address(accounts[0], 'wallet account');
+      const selectedConfig = validateConfig({ ...config, alice: selected });
       try { await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x899' }] }); }
       catch (e) {
         if ((e as { code?: number }).code !== 4902) throw e;
@@ -97,10 +114,20 @@ export default function App() {
         await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x899' }] });
       }
       if (Number(await p.request({ method: 'eth_chainId' })) !== CHAIN_ID) throw new Error('Select Stable Testnet.');
-      await ownerActions().verifyNetwork(); setAccount(accounts[0]); setVerified(true); setNotice('Owner connected. Review the agent address and allowance before approving.');
-      await refresh();
-    } catch (e) { setAccount(undefined); setError(failure(e)); }
+      await createOwnerClient({ config: selectedConfig, publicClient: publicClient(selectedConfig.rpcUrl) }).verifyNetwork();
+      const currentAccounts = await p.request({ method: 'eth_accounts' });
+      if (currentAccounts[0]?.toLowerCase() !== selected.toLowerCase() || Number(await p.request({ method: 'eth_chainId' })) !== CHAIN_ID) throw new Error('Wallet account or network changed while connecting. Connect MetaMask again.');
+      activeOwner.current = selected.toLowerCase();
+      setConfig(selectedConfig); setAccount(selected); setVerified(true); setNotice('Owner connected. Review the agent address and allowance before approving.');
+    } catch (e) { disconnect(); setError(failure(e)); }
     finally { setBusy(false); }
+  }
+  function downloadConfig() {
+    if (!config || !connected) return;
+    const settings = validateConfig({ ...config, defaultAgent: agent.trim() ? address(agent, 'agent address') : undefined });
+    const url = URL.createObjectURL(new Blob([JSON.stringify(settings, null, 2) + '\n'], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'wallet-config.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function ownerClient() {
     if (!config || !provider || !account) throw new Error('Connect the wallet owner in MetaMask first.');
@@ -109,20 +136,23 @@ export default function App() {
     return ownerActions(createWalletClient({ account, chain, transport: custom(provider) }));
   }
   async function confirm(op: OwnerOperation) {
+    const revision = connectionId.current;
     const result = await ownerActions().wait(op);
+    if (revision !== connectionId.current || activeOwner.current !== op.alice.toLowerCase()) return;
     setNotice(`${op.action === 'fund' ? 'Agent gas funding' : BigInt(op.intent.amount) === 0n ? 'Allowance revocation' : 'Agent approval'} ${result.success ? 'confirmed onchain' : 'reverted'}.`);
     await refresh();
   }
   async function submit(action: 'approve' | 'revoke' | 'fund') {
     if (!config || busy || pending || !storageReady) return;
+    const revision = connectionId.current;
     setBusy(true); setError('');
     try {
       const owner = await ownerClient();
       setNotice('Review and confirm this transaction in MetaMask. The wallet owner pays its gas.');
       const op = action === 'fund' ? await owner.fundAgentGas({ agent, amount: gasAmount })
         : action === 'revoke' ? await owner.revoke(agent) : await owner.approve({ agent, amount });
-      setNotice('Submitted. Waiting for onchain confirmation…'); await confirm(op);
-    } catch (e) { setError(failure(e)); setNotice('Check the saved operation and MetaMask history before retrying an uncertain submission.'); }
+      if (revision === connectionId.current) setNotice('Submitted. Waiting for onchain confirmation…'); await confirm(op);
+    } catch (e) { if (revision === connectionId.current) { setError(failure(e)); setNotice('Check the saved operation and MetaMask history before retrying an uncertain submission.'); } }
     finally { setBusy(false); }
   }
   async function reconcile(event?: FormEvent) {
@@ -137,9 +167,10 @@ export default function App() {
     <main>
       <div className="intro"><p className="eyebrow">DIRECT ERC-20 APPROVALS</p><h1>Your tokens.<br /><span>Your agent’s allowance.</span></h1><p>Approve an agent signer to spend test USDT0 from your wallet.<br />The agent uses its own key to pay from that allowance.</p></div>
       <section className="account-panel" aria-label="Wallet owner">
-        <div><p className="eyebrow">WALLET OWNER</p><p className="address">{config?.alice || 'Awaiting public configuration'}</p><p className="account-meta">{verified ? '✓ Token network verified' : 'Token network unverified'}{ownerBalance !== undefined ? ` · ${formatAmount(ownerBalance)} USDT0 available` : ''}</p></div>
-        <button className="primary" disabled={busy || !config} onClick={() => void connect()}>{connected ? 'Owner connected' : 'Connect MetaMask'}</button>
+        <div><p className="eyebrow">WALLET OWNER</p><p className="address">{account || 'Connect your MetaMask account to try the demo'}</p><p className="account-meta">{verified ? '✓ Token network verified' : 'Token network unverified'}{ownerBalance !== undefined ? ` · ${formatAmount(ownerBalance)} USDT0 available` : ''}</p></div>
+        <div className="actions"><button className="primary" disabled={busy || !config || connected} onClick={() => void connect()}>{connected ? 'Owner connected' : busy ? 'Connecting…' : 'Connect MetaMask'}</button>{account && <button disabled={busy} onClick={disconnect}>Disconnect</button>}</div>
       </section>
+      <p className="form-note">Use your own account in the MetaMask extension or MetaMask’s mobile browser. Connecting requests account access; approval and gas funding each need a separate confirmation. <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">Get MetaMask ↗</a> · <a href="https://faucet.stable.xyz" target="_blank" rel="noreferrer">Get test USDT0 ↗</a></p>
       {(storageError || error || networkError) && <div className="message error" role="alert">{storageError || error || networkError}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
       {operation?.hash && <p className="transaction">Latest transaction: <a href={`${EXPLORER}/tx/${operation.hash}`} target="_blank" rel="noreferrer">{operation.hash} ↗</a></p>}
@@ -166,7 +197,9 @@ export default function App() {
       </form>
       <section className="create-panel" aria-label="Send an agent payment">
         <p className="eyebrow">NEXT: PAY FROM THE AGENT</p><h2>Use the agent CLI</h2>
-        <p className="form-note">With Node.js 22+, install the standalone CLI. No repository checkout is needed. Import the operator’s public settings and use your existing signer directory. Check that <code>whoami</code> prints the same agent address shown above.</p>
+        <p className="form-note">With Node.js 22+, install the standalone CLI. For a new signer, run <code>agent-wallet init --json</code> in your chosen state directory, then paste its address into Agent signer above. Reuse your existing state directory if you already have a signer. Check that <code>whoami</code> prints the same agent address shown above.</p>
+        <button disabled={!connected || busy} onClick={() => { try { downloadConfig(); } catch (e) { setError(failure(e)); } }}>Download wallet settings</button>
+        <p className="form-note">Connect MetaMask to download public settings for your wallet, then import that downloaded file below. Your private key stays in MetaMask.</p>
         <pre><code>{`npm install --global @stablechain/agent-wallet-cli@0.2.0
 export WALLET_STATE_DIR="/absolute/path/to/existing/signer"
 agent-wallet whoami --json

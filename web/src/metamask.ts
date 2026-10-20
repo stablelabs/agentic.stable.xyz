@@ -18,6 +18,6 @@ export async function metaMask(): Promise<Provider> {
   window.removeEventListener('eip6963:announceProvider', announced);
   selected ??= window.ethereum?.providers?.find(p => p.isMetaMask && !p.isRabby);
   if (!selected && window.ethereum?.isMetaMask && !window.ethereum.isRabby) selected = window.ethereum;
-  if (!selected) throw new Error('Open this app in Chrome with the MetaMask extension installed.');
+  if (!selected) throw new Error('MetaMask was not found. Install and unlock the MetaMask extension, then reload this page, or open this site in MetaMask’s mobile browser.');
   return selected;
 }

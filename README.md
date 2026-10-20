@@ -54,7 +54,7 @@ npm run wallet -- config import --file web/public/wallet-config.json --json
 npm run dev
 ```
 
-The configuration contains public addresses only. The owner’s private key stays in MetaMask. Fund the owner with test USDT0 from the [Stable faucet](https://faucet.stable.xyz), then open [localhost:5174](http://localhost:5174) in Chrome with MetaMask. Connect the configured owner, approve an allowance, and fund the agent’s gas separately.
+The configuration contains public addresses only. The owner’s private key stays in MetaMask. Fund your account with test USDT0 from the [Stable faucet](https://faucet.stable.xyz), then open [localhost:5174](http://localhost:5174) with the MetaMask extension or in MetaMask’s mobile browser. Connect your account, approve an allowance, and fund the agent’s gas separately. Any visitor can connect their own account; the web app uses the selected MetaMask address as the owner. Use **Download wallet settings** after connecting to get public CLI settings for that owner, then import the downloaded file into your agent’s existing state directory.
 
 If you run another local port, pass `--approval-url http://127.0.0.1:PORT` to `wallet:configure` before importing the settings. `allowance link --amount 0.01` prints a link with the correct signer and approval amount prefilled.
 
