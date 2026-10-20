@@ -1,0 +1,8 @@
+{
+  "chainId": 2201,
+  "rpcUrl": "https://rpc.testnet.stable.xyz",
+  "token": "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9",
+  "alice": "0x32D1d5bbcC0310EB7427D2Aa50952b158B179665",
+  "approvalUrl": "https://agentic.stable.xyz",
+  "schemaVersion": 2
+}

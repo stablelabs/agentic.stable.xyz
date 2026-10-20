@@ -1,45 +1,28 @@
 {
   "name": "@stablechain/agent-wallet-cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
+  "description": "Standalone agent signer and recoverable ERC-20 transferFrom payments on Stable Testnet.",
   "type": "module",
   "bin": {
     "agent-wallet": "./dist/main.js"
   },
-  "exports": {
-    "./agent": {
-      "types": "./dist/agent/index.d.ts",
-      "import": "./dist/agent/index.js"
-    }
-  },
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "skills"
   ],
   "engines": {
-    "node": ">=22"
-  },
-  "dependencies": {
-    "@stablechain/agent-wallet-sdk": "0.1.2",
-    "viem": "^2.38.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.15.0",
-    "typescript": "^5.8.0",
-    "vitest": "^3.2.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/executable.mjs",
-    "wallet": "node dist/main.js",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "prepack": "npm run build"
+    "prepack": "node ../../scripts/build-cli.mjs"
   },
-  "description": "Agent signer, grant discovery, bounded payments, and recovery for Agent Wallet on Stable Testnet.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stablelabs/agentic.stable.xyz.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/stablelabs/agentic.stable.xyz/tree/main/packages/cli#readme",
+  "homepage": "https://github.com/stablelabs/agentic.stable.xyz#readme",
   "bugs": {
     "url": "https://github.com/stablelabs/agentic.stable.xyz/issues"
   },
@@ -47,12 +30,6 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "keywords": [
-    "stablechain",
-    "agent-wallet",
-    "eip-7702",
-    "payments",
-    "testnet",
-    "cli"
-  ]
+  "keywords": ["stablechain", "agent-wallet", "erc20", "payments", "testnet", "cli"],
+  "license": "UNLICENSED"
 }

@@ -1,48 +1,65 @@
-# Agent wallet CLI
+# Agent Wallet CLI
 
-The `agent-wallet` executable manages the local agent signer, grants, payments, and recovery on Stable Testnet. Wallet protocol code comes from its declared `@stablechain/agent-wallet-sdk` dependency.
+Standalone agent signer and ERC-20 `transferFrom` payments for USDT0 on Stable Testnet (chain 2201). Node.js 22+ is required. The npm package includes the compiled runtime, its dependencies, operating docs, and an agent skill. No repository checkout, TypeScript loader, SDK, or install-time build is needed.
 
-Install with Node.js 22 or newer:
+## Install
+
+Install the published release:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.1.2
-agent-wallet --help
+npm install --global @stablechain/agent-wallet-cli@0.2.0
+agent-wallet --version --json
+agent-wallet --help --json
 ```
 
-Or run directly:
+Pin 0.2.0 or a later compatible version. Versions 0.1.x use the retired contract-grant flow.
+
+For a provided release tarball, install it directly with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz`. Maintainers can create this artifact with `npm run pack:cli` from the repository root.
+
+## Configure a signer
+
+Keep one persistent, private directory per signer. Reuse the original directory when upgrading or recovering; changing working directories must not select another signer.
 
 ```sh
-npx --yes --package=@stablechain/agent-wallet-cli@0.1.2 agent-wallet --help
-```
-
-Each agent initializes its own signer and imports owner-provided public wallet settings. Set `WALLET_STATE_DIR` to a persistent private directory, especially in containers:
-
-```sh
-export WALLET_STATE_DIR="$HOME/.local/share/stable-agent-wallet"
+export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
 agent-wallet init --json
-agent-wallet config import --file ./wallet-config.json --json
 agent-wallet whoami --json
-agent-wallet grants link --recipient "$RECIPIENT" --budget 0.01 --expires-in 24h --json
+agent-wallet config import --file /absolute/path/wallet-config.json --json
+agent-wallet doctor --json
+agent-wallet allowance link --amount 0.01 --json
 ```
 
-Obtain `wallet-config.json` from the owner or operator after account activation. Import verifies the network, pinned implementation, and account delegation; it does not grant spending permission. The owner reviews the approval link, authorizes the grant, and funds the agent's gas through the approval UI.
+For an existing signer, set `WALLET_STATE_DIR` to its existing absolute directory instead. Never replace a key to fix missing configuration.
 
-Payments require a stable payment ID. Use `payments prepare` to save one, then `pay --payment-id ID` to submit it. Recover an uncertain submission with `payments wait ID` or `payments resume ID`, retaining the same ID and journal. State contains a plaintext signer key and signed transactions; use one private, persistent directory per signer. The CLI does not activate the owner's account or read the owner's key.
+Obtain public configuration from the operator, or create a JSON file using the actual owner address and approval page:
 
-Every command supports `--json` with a versioned result envelope and symbolic errors. Check `data.status` to distinguish submission from confirmation; `doctor` returns diagnostics in `data.checks` and `data.ready`. See the [CLI reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md) for commands, exit codes, public configuration, and recovery.
+```json
+{
+  "schemaVersion": 2,
+  "chainId": 2201,
+  "rpcUrl": "https://rpc.testnet.stable.xyz",
+  "token": "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9",
+  "alice": "OWNER_ADDRESS",
+  "approvalUrl": "https://agentic.stable.xyz"
+}
+```
 
-For repository development:
+Replace `OWNER_ADDRESS` before importing. The hosted approval page must use that same owner. Config import verifies network/token but does not approve spending. Share the returned approval link with the owner; they approve the agent directly on the token and fund its native gas separately in their wallet. The allowance permits any recipient and has no expiry. The owner can revoke the remainder with `approve(agent, 0)`.
+
+## Pay and recover
 
 ```sh
-npm ci
-npm run build:sdk
-npm run build --workspace @stablechain/agent-wallet-cli
-npm run wallet -- --help
-npm run test --workspace @stablechain/agent-wallet-cli
+agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.001 --json
+# Save data.paymentId as PAYMENT_ID, then use that same ID:
+agent-wallet pay --payment-id "$PAYMENT_ID" --dry-run --json
+agent-wallet pay --payment-id "$PAYMENT_ID" --no-wait --json
+agent-wallet payments wait "$PAYMENT_ID" --timeout 45s --json
 ```
 
-The package compiles its own `src` into `dist`, exposes `dist/main.js` as the executable, and exports Node-only services through `@stablechain/agent-wallet-cli/agent` for the repository's compatibility scripts. It does not copy SDK source or bundle private signing state.
+Replace `RECIPIENT_ADDRESS` with the authorized recipient. Token amounts have six decimals; native gas amounts have eighteen. A simulation or transaction hash is not a confirmed payment. Check `data.status` for `confirmed`.
 
-The public npm package includes compiled JavaScript, declarations, this README, and its manifest. The prepack hook rebuilds the package before packing or publishing. The SDK is a separate public dependency; React and the repository's build tools are not runtime dependencies.
+For uncertain outcomes, retain the ID and state. `payments show ID` and `payments wait ID` do not broadcast; `payments resume ID` can submit or rebroadcast. A new ID can pay twice: IDs are local recovery records, not onchain duplicate protection. Private state contains a plaintext key and signed transactions; keep it out of logs, web assets, and source control.
 
-The CLI and SDK are published together from matching version tags, using GitHub Actions trusted publishing. See the [release guide](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/releases.md).
+Read the bundled [CLI reference](docs/cli.md), [operating guide](docs/wallet.md), and [agent skill](skills/agent-wallet-cli/SKILL.md). For Codex discovery, copy the entire skill directory from `$(npm root --global)/@stablechain/agent-wallet-cli/skills/agent-wallet-cli` into `~/.codex/skills/`, then invoke `$agent-wallet-cli` in a new session. Other agents can load its `SKILL.md` directly.
+
+Test-only, unaudited code. No merchant delivery guarantee or production custody service is included.

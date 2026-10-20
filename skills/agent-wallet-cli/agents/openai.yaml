@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Wallet CLI"
+  short_description: "Run Stable agent payments with reliable recovery"
+  default_prompt: "Use $agent-wallet-cli to inspect my signer and complete an authorized Stable Testnet payment."

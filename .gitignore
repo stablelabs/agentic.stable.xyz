@@ -1,25 +1,29 @@
 node_modules/
+packages/cli/dist/
+packages/cli/docs/
+packages/cli/skills/
+*.tgz
 *.log
 .DS_Store
 
 # Private wallet keys, state, signed transactions and local environment files
 .agent-wallet/
+.agent-wallet-erc20/
 .env.*.local
 agent-wallet/.env.alice.local
 
-# Generated contract artifacts, browser build and test reports
-packages/contracts/out/
-packages/contracts/cache/
-packages/*/dist/
-*.tgz
-.release/
-packages/web/public/wallet-config.json
-packages/web/test-results/
+# Generated web build, public development settings, and test reports
+web/dist/
+web/public/wallet-config.json
+web/test-results/
+web/deployment/env.d.ts
 playwright-report/
 .wrangler/
 .dev.vars*
-packages/web/deployment/env.d.ts
 
 .projects/*
 !.projects/state.json
 .env
+
+# Disposable private-state fixtures used by server-isolation tests
+.agent-wallet-fixture-*/

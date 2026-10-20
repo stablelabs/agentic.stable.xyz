@@ -1,141 +1,109 @@
-# Agent Wallet
+# Agent spending demo
 
-Let a program spend from your wallet, within rules you approve.
+Approve an agent to spend a limited amount of test USDT0 from your wallet. The agent uses its own key to call the token’s `transferFrom` method and pays its own transaction fees.
 
-- **Live demo:** [agentic.stable.xyz](https://agentic.stable.xyz).
-- **Network:** Stable Testnet. Payments use test USDT0.
-- **Status:** Proof of concept. Unaudited. No mainnet support.
+The flow is ordinary ERC-20 approval on **Stable Testnet**:
 
-## Install the CLI or SDK
+1. The agent generates a local keypair and shares its address.
+2. The wallet owner approves that address on the USDT0 token.
+3. The owner sends the agent native USDT0 for gas.
+4. The agent sends payments from the owner’s token balance, consuming its allowance.
 
-With Node.js 22 or newer, run the published CLI without cloning the repository:
+**An allowance limits the amount, not the recipient or time.** The agent can choose any recipient, and permission has no automatic expiry. The owner can revoke the remaining allowance with `approve(agent, 0)`. Approval does not reserve funds; both balance and allowance must be sufficient. Gas funding is separate and is not returned by revoking permission.
 
-```sh
-npx --yes --package=@stablechain/agent-wallet-cli@0.1.2 agent-wallet --help
-```
+## Install the agent CLI
 
-For a persistent installation, use `npm install --global @stablechain/agent-wallet-cli@0.1.2`. Follow the [CLI guide](docs/cli.md) to create an agent signer, import public account settings, obtain Alice's approval, and submit payments. Keep the agent's state directory across runs.
-
-Applications can install the owner SDK separately:
+With Node.js 22+, install the standalone CLI:
 
 ```sh
-npm install @stablechain/agent-wallet-sdk@0.1.2 viem
+npm install --global @stablechain/agent-wallet-cli@0.2.0
+agent-wallet --version --json
+agent-wallet --help --json
 ```
 
-See the [SDK guide](docs/sdk.md) for owner operations and recovery. The published CLI and SDK do not require the repository's Foundry or web build tools.
+The package bundles its runtime, docs, and agent skill; agents do not need to clone this repo or install an SDK. Pin this version: 0.1.x uses the retired contract-grant flow. For an operator-provided tarball produced by `npm run pack:cli`, install it with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz`.
 
-## Start with the people and the money
+For a new signer:
 
-- **Alice** owns the wallet and approves permissions.
-- **The agent** is software that acts for Alice. Here, it uses the local CLI signer; no AI model is included.
-- **A signing key** is a secret used to authorize transactions. A **signature** lets the network verify the signer.
-- **A smart contract** is code the blockchain runs. This contract checks each payment before moving Alice's funds.
-
-Alice gives the agent a **grant**: permission to pay one recipient, up to a total amount, before a deadline.
-
-The agent uses its own key. Alice authorizes the grant once; the contract checks each payment.
-
-```mermaid
-flowchart TD
-    Alice[Alice: wallet owner] -->|Authorizes a grant|Account[Alice's account: checks every payment]
-    Alice -->|Sends a separate gas top-up|Agent[Agent: local signer]
-    Agent -->|Submits a signed payment|Account
-    Account -->|Transfers funds if allowed|Recipient[Approved recipient]
+```sh
+export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
+agent-wallet init --json
+agent-wallet whoami --json
+agent-wallet config import --file /absolute/path/wallet-config.json --json
+agent-wallet allowance link --amount 0.01 --json
 ```
 
-## One grant, three attempts
+For an existing signer, use its **original absolute state directory** instead. Installation does not move keys or journals, and the CLI's default directory remains relative to the working directory. Obtain public settings from the operator or create them using the [public configuration schema](skills/agent-wallet-cli/references/configuration.md). The approval page must use the same owner. Share the returned approval link with the owner to approve the agent and fund its gas separately.
 
-Alice authorizes a total budget of **0.01 USDT0** for one recipient.
+## Run the demo
 
-| Attempt | Result | Budget left |
-| --- | --- | --- |
-| Pay `0.006` | Succeeds | `0.004` |
-| Pay another `0.006` | Blocked: exceeds the remaining budget | `0.004` |
-| Pay `0.004` | Succeeds | `0` |
-
-- The budget covers successful payments together. It does not reset after each payment.
-- The contract also checks the signer, recipient, deadline, grant status, and payment ID.
-- A payment ID labels one intended payment. After success, it cannot be used again under any grant on Alice's account.
-- A blocked payment leaves Alice's funds and recorded spending unchanged. An included transaction that fails can still cost gas.
-
-Grants do not reserve funds. Alice must keep enough money available. Two `0.01` grants can permit `0.02` in total.
-
-## Who pays gas?
-
-**Gas** is the network fee for executing a transaction.
-
-- Alice pays to enable her account, create or revoke grants, and send gas funding.
-- The agent pays the gas for its payments. The payment amount comes from Alice.
-- The app shows the agent's balance and an estimated gas reserve. Alice can click **Fund agent gas** for a separate MetaMask transfer.
-- That top-up is outside the grant budget. The agent controls it; revoking a grant does not return it.
-
-## Why Alice keeps her address
-
-[EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) lets an existing account execute contract code. Alice enables the wallet code once through a local script. Her address and funds stay in place.
-
-- EIP-7702 enables the code. This contract supplies the spending limits.
-- Delegation persists after grant expiry. Revoking a grant does not remove the wallet code.
-- Alice's owner key still controls the account and can replace the delegation. These limits constrain the agent, not Alice.
-
-See the [wallet guide](docs/wallet.md#how-transactions-reach-alices-account) for the exact MetaMask and payment paths.
-
-## Repository packages
-
-The repository is an npm workspace with four separate packages:
-
-| Package | Directory | Responsibility |
-| --- | --- | --- |
-| `agent-wallet-web` | [packages/web](packages/web) | React UI that imports owner operations from `@stablechain/agent-wallet-sdk`. |
-| `@stablechain/agent-wallet-cli` | [packages/cli](packages/cli) | Agent executable and private local state; depends on the SDK protocol entry. |
-| `@stablechain/agent-wallet-sdk` | [packages/sdk](packages/sdk) | Owner API and shared browser-compatible wallet protocol. |
-| `agent-wallet-contracts` | [packages/contracts](packages/contracts) | Solidity implementation, Foundry tests, migration fixtures, and compiled artifacts. |
-
-Each package owns its source, manifest, build, checks, and tests. Root `scripts/` contains operator tools and compatibility adapters, `tests/` contains integration and packaging checks, and `docs/` contains guides. The root package orchestrates the workspaces.
-
-Run development commands from the repository root with Node.js 22+ and npm. Full checks and contract builds require [Foundry](https://getfoundry.sh/introduction/installation); use version 1.5.1 to match release CI. Browser tests also need Playwright's Chromium:
+Use Node.js 22+ and npm. Run every command below from this repository’s root. No package build, Solidity compiler, or account activation is required for the CLI.
 
 ```sh
 npm ci
-npx playwright install chromium
-npm run build          # SDK, CLI, web app, and contracts; requires Foundry
-npm run build:cloudflare # Web deployment build; no Foundry required
-npm run dev            # Build SDK and start the web app
-npm run wallet -- --help
-npm run check
-npm test
-npm run test:contracts
-npm run test:browser
+export WALLET_STATE_DIR="$PWD/.agent-wallet-erc20"
+npm run wallet -- init --json
+npm run wallet -- whoami --json
 ```
 
-To work on one package, use `npm run build --workspace PACKAGE`, replacing `PACKAGE` with a name from the table. Build the SDK before its consumers. `npm run build:tools` builds the SDK and CLI; `npm run dev:sdk` watches the SDK in a second terminal during development. See [checks](docs/wallet.md#checks) for test prerequisites and a fresh-cache packaging check.
-
-Pushes to `main` deploy the web app. Matching stable version tags publish the SDK and CLI through npm trusted publishing after checks pass. Manual release workflow runs perform dry runs. See the [release guide](docs/releases.md) before preparing a version.
-
-## Use the demo or run your own
-
-- The [hosted demo](https://agentic.stable.xyz) displays one configured Alice account. You can inspect its grants. Only Alice can manage them.
-- For your own account, follow the [setup guide](docs/wallet.md#1-set-up-alice-and-the-agent). You need Node.js 22+, Foundry, Chrome MetaMask, and test USDT0.
-- Keys stay local. Git ignores Alice's key file and the agent's state directory; see [setup](docs/wallet.md#1-set-up-alice-and-the-agent).
-- The browser uses MetaMask. Cloudflare serves the UI and public configuration; it does not run the agent or sign payments.
-
-Already set up? From the repository root:
+Retain this directory and the address printed by `whoami`. Replace the placeholders below with the wallet owner’s address and that agent address:
 
 ```sh
-npm ci
+npm run wallet:configure -- --owner OWNER_ADDRESS --agent AGENT_ADDRESS
+npm run wallet -- config import --file web/public/wallet-config.json --json
 npm run dev
 ```
 
-Open [localhost:5174](http://localhost:5174) in Chrome. Retain your keys and transaction records.
+The configuration contains public addresses only. The owner’s private key stays in MetaMask. Fund the owner with test USDT0 from the [Stable faucet](https://faucet.stable.xyz), then open [localhost:5174](http://localhost:5174) in Chrome with MetaMask. Connect the configured owner, approve an allowance, and fund the agent’s gas separately.
 
-## Find the next step
+If you run another local port, pass `--approval-url http://127.0.0.1:PORT` to `wallet:configure` before importing the settings. `allowance link --amount 0.01` prints a link with the correct signer and approval amount prefilled.
 
-- [Use the agent CLI](docs/cli.md) or [integrate the owner SDK](docs/sdk.md).
-- [Set up, authorize, fund, and pay](docs/wallet.md#1-set-up-alice-and-the-agent).
-- [Recover a payment after a timeout](docs/wallet.md#4-recover-without-paying-twice).
-- [Run local checks and live acceptance](docs/wallet.md#checks).
-- [Deploy to Cloudflare](docs/wallet.md#deploy).
-- [Release the CLI and SDK to npm](docs/releases.md).
-- [Read the implemented CLI and SDK design](docs/cli-plan.md).
-- [Read the contract](packages/contracts/src/AgentWallet.sol), [shared client](packages/sdk/src/client/client.ts), or [UI](packages/web/src/App.tsx).
+## Send a payment
 
-This demo proves bounded transfers. It does not provide merchant delivery, gas sponsorship, an AI decision system, or production custody.
+```sh
+agent-wallet allowance show --json
+agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.006 --json
+```
+
+Copy `data.paymentId` from the preparation result, then:
+
+```sh
+PAYMENT_ID="paste data.paymentId here"
+agent-wallet pay --payment-id "$PAYMENT_ID" --dry-run --json
+agent-wallet pay --payment-id "$PAYMENT_ID" --json
+```
+
+Under a `0.01` allowance, `0.006` succeeds, another `0.006` is rejected, and a new `0.004` payment can spend the remainder. Use a recipient different from the owner to demonstrate funds moving; a self-transfer can still consume allowance without changing the owner’s token balance.
+
+For source development, replace `agent-wallet` with `npm --silent run wallet --` from the repository root after `npm ci`. Use the same state directory with either runner.
+
+Payment IDs are local recovery labels. The token does not know them. If submission times out, inspect the same payment with `payments show ID`, observe it with `payments wait ID`, or recover with `payments resume ID`. Never create a new payment to retry an uncertain submission. The CLI saves signed bytes and nonce before broadcast and reuses them during recovery.
+
+The direct flow has been exercised on testnet: [this confirmed agent transaction](https://testnet.stablescan.xyz/tx/0xa9f5eb8c3d29f9ef352b85124dfd12c03844a302a01aeb98ce24d8a1af43e678) called USDT0 `transferFrom` for a `0.001` self-transfer. See [the recorded example and operating notes](docs/wallet.md).
+
+## What stays in the repo
+
+| Directory | Purpose |
+| --- | --- |
+| [web](web) | MetaMask approval, revocation, gas funding, and payment instructions |
+| [agent](agent) | Local signer and payment CLI, including receipt verification and recovery |
+| [shared](shared) | Internal token/configuration helpers shared by the browser and CLI |
+| [tests](tests) | Signing, allowance, transaction recovery, CLI, and development-server isolation tests |
+
+The CLI is the demo’s runnable agent: it keeps signing outside the browser and handles payment recovery. [packages/cli](packages/cli) packages the same source as a standalone npm executable, including its viem runtime. The root app remains private, the shared layer remains internal, and there is no separately published SDK or custom spending contract. Maintainers can [build, verify, and publish the CLI](docs/cli.md#building-and-publishing).
+
+```sh
+npm run check
+npm test
+npx playwright install chromium
+npm run test:browser
+npm run build
+```
+
+`build` creates `web/dist` with the versioned public deployment settings. The [deployment workflow](.github/workflows/deploy.yml) checks and deploys pushes to `main` to [agentic.stable.xyz](https://agentic.stable.xyz). Cloudflare serves assets and public settings only; no hosted signer or payment API exists.
+
+Read the [CLI reference](docs/cli.md) for commands and errors, and the [operating guide](docs/wallet.md) for state, recovery, migration, and hosting. Existing schema-2 signers and journals remain compatible. If you used the retired contract-grant flow, read the migration notes before spending.
+
+For agent-driven operation, load [the Agent Wallet CLI skill](skills/agent-wallet-cli/SKILL.md). It covers installation, signer discovery, owner approval handoff, payment verification, and recovery without duplicate transfers. The npm package includes it under `$(npm root --global)/@stablechain/agent-wallet-cli/skills/agent-wallet-cli`. Any agent can read `SKILL.md` directly. For Codex discovery, copy that entire skill directory into `~/.codex/skills/`, then invoke `$agent-wallet-cli` in a new session. Refresh the copied skill after upgrading.
+
+Test-only, unaudited code supporting Stable Testnet USDT0. No AI model, merchant delivery guarantee, gas sponsorship, or production custody service is included.

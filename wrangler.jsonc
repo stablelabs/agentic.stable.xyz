@@ -2,12 +2,12 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "agentic-stable",
   "account_id": "800c4ef344ae29a93b1588a10962b72c",
-  "main": "packages/web/deployment/worker.ts",
+  "main": "web/deployment/worker.ts",
   "compatibility_date": "2026-10-14",
   "workers_dev": true,
   "preview_urls": false,
   "routes": [{ "pattern": "agentic.stable.xyz", "custom_domain": true }],
-  "assets": { "directory": "./packages/web/dist", "binding": "ASSETS" },
+  "assets": { "directory": "./web/dist", "binding": "ASSETS" },
   // Retain the existing namespace and data. The wallet does not use this binding.
   "durable_objects": {
     "bindings": [{ "name": "FUNDING_LEDGER", "class_name": "FundingLedger" }]

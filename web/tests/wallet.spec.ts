@@ -1,0 +1,164 @@
+import { expect, test, type Page } from '@playwright/test';
+import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionData, encodeFunctionResult, keccak256, toHex, type Hex } from 'viem';
+import { tokenAbi, TOKEN } from '../../shared/protocol.js';
+const alice = '0x1111111111111111111111111111111111111111';
+const agent = '0x2222222222222222222222222222222222222222';
+const other = '0x3333333333333333333333333333333333333333';
+const rpcUrl = 'https://rpc.agent-wallet.invalid';
+const blockHash = keccak256('0x03');
+const config = { schemaVersion: 2, chainId: 2201, rpcUrl, token: TOKEN, alice, approvalUrl: 'http://127.0.0.1:5174', defaultAgent: agent };
+const block = { number: '0x64', hash: blockHash, parentHash: blockHash, timestamp: toHex(1791936000), baseFeePerGas: '0x3b9aca00', gasLimit: '0x1c9c380', gasUsed: '0x5208', miner: alice, difficulty: '0x0', totalDifficulty: '0x0', nonce: '0x0000000000000000', extraData: '0x', logsBloom: `0x${'00'.repeat(256)}`, transactions: [], size: '0x100' };
+type Tx = { to: string; data?: Hex; value?: Hex };
+async function fixture(page: Page, options: { allowance?: bigint; wrongAccount?: boolean; reject?: boolean; unknown?: boolean; mismatch?: boolean; reverted?: boolean; missingEvent?: boolean; rpcDown?: boolean; noDefaultAgent?: boolean } = {}) {
+  let allowance = options.allowance ?? 0n; let gas = 0n;
+  const submissions: Tx[] = []; const transactions = new Map<Hex, Tx>(); const logs = new Map<Hex, any[]>();
+  await page.route('**/wallet-config.json', route => route.fulfill({ json: {...config, defaultAgent: options.noDefaultAgent ? undefined : agent} }));
+  await page.route(`${rpcUrl}/`, async route => {
+    const body = route.request().postDataJSON();
+    const result = ({ method, params }: any): unknown => {
+      if (method === 'eth_chainId') return '0x899';
+      if (method === 'eth_getBalance') return toHex(params[0].toLowerCase() === agent ? gas : 10n ** 20n);
+      if (method === 'eth_blockNumber') return '0x64';
+      if (method === 'eth_getBlockByNumber') return block;
+      if (method === 'eth_estimateGas') {
+        const tx = params[0];
+        if (tx.to.toLowerCase() !== TOKEN.toLowerCase() && tx.to.toLowerCase() !== agent) throw new Error('Unexpected target');
+        return '0x186a0';
+      }
+      if (method === 'eth_getTransactionByHash') {
+        const tx = transactions.get(params[0]);
+        return { hash: params[0], blockHash, blockNumber: '0x64', from: alice, to: options.mismatch ? other : tx?.to, nonce: '0x0', gas: '0x10000', gasPrice: '0x1', value: tx?.value || '0x0', input: tx?.data || '0x', type: '0x2', chainId: '0x899', transactionIndex: '0x0', v: '0x0', r: '0x1', s: '0x1' };
+      }
+      if (method === 'eth_getTransactionReceipt') return { transactionHash: params[0], blockHash, blockNumber: '0x64', from: alice, to: transactions.get(params[0])?.to, contractAddress: null, cumulativeGasUsed: '0x5208', gasUsed: '0x5208', effectiveGasPrice: '0x1', status: options.reverted ? '0x0' : '0x1', transactionIndex: '0x0', type: '0x2', logs: logs.get(params[0]) || [], logsBloom: `0x${'00'.repeat(256)}` };
+      if (method === 'eth_call') {
+        if (params[0].to.toLowerCase() !== TOKEN.toLowerCase()) throw new Error('Only token calls are supported');
+        const decoded = decodeFunctionData({ abi: tokenAbi, data: params[0].data });
+        const values: any = { decimals: 6, symbol: 'USDT0', balanceOf: 1_000_000n, allowance, approve: true };
+        return encodeFunctionResult({ abi: tokenAbi, functionName: decoded.functionName, result: values[decoded.functionName] } as never);
+      }
+      throw new Error(`Unexpected RPC method ${method}`);
+    };
+    const response = (r: any) => options.rpcDown ? { jsonrpc: '2.0', id: r.id, error: { code: -32000, message: 'RPC unavailable' } } : { jsonrpc: '2.0', id: r.id, result: result(r) };
+    await route.fulfill({ json: Array.isArray(body) ? body.map(response) : response(body) });
+  });
+  await page.exposeFunction('walletTestSubmit', (tx: Tx) => {
+    submissions.push(tx); const hash = keccak256(toHex(submissions.length)); transactions.set(hash, tx);
+    if (tx.to.toLowerCase() === agent) { if (!options.reverted) gas += BigInt(tx.value!); return hash; }
+    expect(tx.to.toLowerCase()).toBe(TOKEN.toLowerCase());
+    const decoded = decodeFunctionData({ abi: tokenAbi, data: tx.data! }); expect(decoded.functionName).toBe('approve');
+    const [spender, value] = decoded.args as [Hex, bigint]; expect(spender).toBe(agent);
+    if (!options.reverted) allowance = value;
+    logs.set(hash, options.missingEvent ? [] : [{ address: TOKEN, topics: encodeEventTopics({ abi: tokenAbi, eventName: 'Approval', args: { owner: alice, spender: agent } }), data: encodeAbiParameters([{ type: 'uint256' }], [value]), blockHash, blockNumber: '0x64', transactionHash: hash, transactionIndex: '0x0', logIndex: '0x0', removed: false }]);
+    return hash;
+  });
+  await page.addInitScript(({ account, reject, unknown }) => {
+    const listeners: Record<string, (() => void)[]> = {};
+    (window as any).ethereum = { isMetaMask: true, request: async ({ method, params }: any) => {
+      if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [account];
+      if (method === 'eth_chainId') return '0x899'; if (method === 'wallet_switchEthereumChain') return null;
+      if (method === 'eth_sendTransaction') {
+        if (reject) throw Object.assign(new Error('Rejected'), { code: 4001 });
+        const hash = await (window as any).walletTestSubmit(params[0]);
+        if (unknown) throw new Error('Lost wallet response'); return hash;
+      }
+      throw new Error(`Unexpected wallet method ${method}`);
+    }, on: (name: string, fn: () => void) => { (listeners[name] ||= []).push(fn); }, removeListener: () => {} };
+    (window as any).walletTestSwitch = () => listeners.accountsChanged?.forEach(fn => fn());
+  }, { account: options.wrongAccount ? agent : alice, reject: !!options.reject, unknown: !!options.unknown });
+  return submissions;
+}
+async function connect(page: Page) { await page.goto('/'); await page.getByRole('button', { name: 'Connect MetaMask' }).click(); await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible(); }
+test('approves the agent directly on the token and revokes the remaining allowance', async ({ page }) => {
+  const submissions = await fixture(page); await connect(page);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  expect(submissions[0].to.toLowerCase()).toBe(TOKEN.toLowerCase());
+  expect(submissions[0].data).toBe(encodeFunctionData({ abi: tokenAbi, functionName: 'approve', args: [agent, 10_000n] }));
+  await expect(page.getByText('Remaining token allowance:')).toContainText('0.01 USDT0');
+  await page.getByRole('button', { name: 'Revoke allowance' }).click();
+  await expect(page.getByRole('status')).toContainText('Allowance revocation confirmed');
+  await expect(page.getByText('Remaining token allowance:')).toContainText('0 USDT0');
+});
+test('requires a confirmed zero reset before setting another positive amount', async ({ page }) => {
+  const submissions = await fixture(page, { allowance: 4000n }); await connect(page);
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Revoke allowance' }).click(); await expect(page.getByRole('status')).toContainText('revocation confirmed');
+  await page.getByLabel('Allowance amount (USDT0)').fill('0.02'); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByText('Remaining token allowance:')).toContainText('0.02 USDT0'); expect(submissions).toHaveLength(2);
+});
+test('rejects the wrong owner and invalidates authority on account changes', async ({ page }) => {
+  await fixture(page, { wrongAccount: true }); await page.goto('/'); await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('alert')).toContainText('Select the configured owner'); await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+});
+test('requires reconnecting after the connected account changes', async ({ page }) => {
+  await fixture(page); await connect(page); await page.evaluate(() => (window as any).walletTestSwitch());
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+});
+test('rejects excess precision before requesting an approval', async ({ page }) => {
+  const submissions = await fixture(page); await connect(page); await page.getByLabel('Allowance amount (USDT0)').fill('0.0000001');
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('6 fractional digits'); expect(submissions).toHaveLength(0);
+});
+test('wallet rejection permits a later explicit attempt', async ({ page }) => {
+  await fixture(page, { reject: true }); await connect(page); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Owner rejected'); await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+});
+test('funds agent gas separately without changing the token allowance', async ({ page }) => {
+  const submissions = await fixture(page, { allowance: 10_000n }); await connect(page); await page.getByLabel('Gas top-up (native USDT0)').fill('0.02');
+  await page.getByRole('button', { name: 'Fund agent gas' }).click(); await expect(page.getByRole('status')).toContainText('Agent gas funding confirmed');
+  expect(submissions[0].to.toLowerCase()).toBe(agent); expect(BigInt(submissions[0].value!)).toBe(2n * 10n ** 16n);
+  await expect(page.getByText('Remaining token allowance:')).toContainText('0.01 USDT0');
+});
+test('preserves unknown approval across reload and verifies a recovered hash before another submission', async ({ page }) => {
+  const submissions = await fixture(page, { unknown: true }); await connect(page); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('outcome is unknown'); await page.reload();
+  await expect(page.getByRole('region', { name: 'Pending operation' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Fund agent gas' })).toBeDisabled();
+  await page.getByLabel('Transaction hash from MetaMask').fill(keccak256(toHex(1))); await page.getByRole('button', { name: 'Verify transaction' }).click();
+  await expect(page.getByRole('status')).toContainText('Agent approval confirmed'); expect(submissions).toHaveLength(1);
+});
+test('keeps mismatched gas funding unresolved instead of allowing another transfer', async ({ page }) => {
+  await fixture(page, { mismatch: true }); await connect(page); await page.getByRole('button', { name: 'Fund agent gas' }).click();
+  await expect(page.getByRole('alert')).toContainText('does not match'); await page.reload(); await connect(page);
+  await expect(page.getByRole('button', { name: 'Fund agent gas' })).toBeDisabled(); await expect(page.getByRole('button', { name: 'Revoke allowance' })).toBeDisabled();
+});
+test('does not report an approval confirmed without a matching token event', async ({ page }) => {
+  await fixture(page, { missingEvent: true }); await connect(page); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('matching token Approval'); await expect(page.getByRole('button', { name: 'Fund agent gas' })).toBeDisabled();
+});
+test('reports reverted transactions and permits a new explicit submission', async ({ page }) => {
+  await fixture(page, { reverted: true }); await connect(page); await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('reverted'); await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+});
+test('approval links prefill only agent and amount and explain actual token permissions', async ({ page }) => {
+  await fixture(page); await page.goto(`/?agent=${agent}&amount=0.025`);
+  await expect(page.getByLabel('Allowance amount (USDT0)')).toHaveValue('0.025');
+  await expect(page.getByText('The agent can send up to')).toContainText('any recipient'); await expect(page.getByText('The agent can send up to')).toContainText('no automatic expiry');
+  await expect(page.getByLabel('Expires (UTC)')).toHaveCount(0); await expect(page.getByLabel('Allowed recipient')).toHaveCount(0);
+});
+test('handles RPC unavailability without claiming a verified token network', async ({ page }) => {
+  await fixture(page, { rpcDown: true }); await page.goto('/'); await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+});
+test('fits a phone viewport and exposes no private key input', async ({ page }, testInfo) => {
+  await fixture(page); await page.setViewportSize({ width: 390, height: 844 }); await connect(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.locator('input[type=password]')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true });
+});
+test('blocks new wallet submissions when saved operation storage is corrupt', async ({ page }) => {
+  const submissions = await fixture(page);
+  await page.addInitScript(({alice, token}) => localStorage.setItem(`stable-token-allowance:v2:${alice}:${token.toLowerCase()}:operation`, '{'), {alice, token: TOKEN});
+  await connect(page);
+  await expect(page.getByRole('alert')).toContainText('Cannot read saved wallet operations');
+  await expect(page.getByRole('button', {name: 'Approve agent', exact: true})).toBeDisabled();
+  await expect(page.getByRole('button', {name: 'Fund agent gas'})).toBeDisabled();
+  expect(submissions).toHaveLength(0);
+});
+
+test('invites a signer address without showing an error when no agent is preselected', async ({page}) => {
+  await fixture(page, {noDefaultAgent: true}); await page.goto('/');
+  await expect(page.getByText('✓ Token network verified')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByLabel('Agent signer', {exact: true})).toHaveValue('');
+  await expect(page.getByText('Remaining token allowance:')).toContainText('Enter an agent address');
+  await expect(page.getByRole('region', {name: 'Send an agent payment'})).toContainText('agent-wallet payments prepare');
+});
