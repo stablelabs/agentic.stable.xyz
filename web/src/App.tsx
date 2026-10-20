@@ -42,17 +42,14 @@ export default function App() {
       const approvalLink = new URL(settings.approvalUrl);
       approvalLink.searchParams.set('agent', 'AGENT_SIGNER_ADDRESS');
       approvalLink.searchParams.set('amount', budget);
-      setupPrompt = `Read and follow the local signer setup section of this skill:
-${skillUrl}
+      setupPrompt = `Use the agent-wallet-cli skill at ${skillUrl} and follow its "Set up a signer" section.
 
-Create or reuse an agent signer for my connected MetaMask owner address ${settings.alice} on Stable Testnet (chain 2201). Follow the skill's identity checks. For a new signer, use init, then read its public address with whoami.
+My MetaMask owner address on Stable Testnet (chain 2201) is ${settings.alice}. Save it so you can configure payments later.
 
-This task is local signer setup only. Do not import configuration, run doctor/status, or contact RPC. The CLI's allowance link requires imported configuration, so construct the URL locally instead.
-
-Return your public signer address and an approval link requesting ${budget} USDT0 allowance. Replace only AGENT_SIGNER_ADDRESS in this URL with the exact public address returned by whoami:
+Create or reuse a signer, then return its address and an approval link requesting ${budget} USDT0 allowance. To build the link, replace AGENT_SIGNER_ADDRESS in this URL with the address that init returns:
 ${approvalLink.href}
 
-I will review and approve in MetaMask; the browser handles its network checks. Configuration and RPC checks belong to a later balance or payment task. Keep the signer private key in your agent environment and describe any limits on storage persistence. Never request my MetaMask private key. Stop before making any payment.`;
+Tell me if your storage might not persist between sessions. Stop before making any payment.`;
     } catch { /* An invalid allowance cannot become an instruction to the agent. */ }
   }
   useEffect(() => { setPromptCopied(false); setPromptCopyError(''); }, [setupPrompt]);
@@ -220,7 +217,7 @@ I will review and approve in MetaMask; the browser handles its network checks. C
         <ol className="setup-steps"><li>Copy the prompt and paste it into an agent with terminal access.</li><li>Let your agent handle setup, then open the approval link it returns.</li><li>Connect MetaMask on that page, review the allowance, and fund the agent’s gas.</li></ol>
         <div className="actions"><button className="primary" disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>{promptCopied ? 'Setup prompt copied' : 'Copy setup prompt'}</button><a href={skillPageUrl} target="_blank" rel="noreferrer">View skill ↗</a><a href="#agent-allowance">I already have an agent address ↓</a></div>
         <p className="form-note" aria-live="polite">{!connected ? 'Connect MetaMask above to include your wallet’s public address.' : !setupPrompt ? 'Enter a valid allowance amount below to generate the setup prompt.' : promptCopyError || (promptCopied ? 'Paste the prompt into your agent app. When setup finishes, open the approval link it returns.' : 'The prompt includes your public wallet address and the allowance amount below. Setup does not send a payment.')}</p>
-        {setupPrompt && <details className="setup-prompt" open={promptCopyError ? true : undefined}><summary>View or manually copy setup prompt</summary><textarea aria-label="Agent setup prompt" readOnly value={setupPrompt} rows={12} onFocus={event => event.currentTarget.select()} /></details>}
+        {setupPrompt && <details className="setup-prompt" open={promptCopyError ? true : undefined}><summary>View or manually copy setup prompt</summary><textarea aria-label="Agent setup prompt" readOnly value={setupPrompt} rows={9} onFocus={event => event.currentTarget.select()} /></details>}
       </section>
       <section className="message"><strong>What this permission allows</strong><p>The agent can send up to its remaining allowance to any recipient. There is no automatic expiry. Revoke the allowance to stop future spending; confirmed payments cannot be undone.</p></section>
       <form id="agent-allowance" className="create-panel" aria-label="Approve agent" onSubmit={event => { event.preventDefault(); void submit('approve'); }}>

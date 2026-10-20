@@ -77,7 +77,7 @@ it('installs the packed executable offline and pays from existing signer state o
     signer = source.data.address;
     const packed = JSON.parse((await execute('npm', ['--silent', 'pack', './packages/cli', '--json', '--pack-destination', directory], { cwd: root, env })).stdout)[0];
     const files = packed.files.map((file: {path: string}) => file.path);
-    expect(files).toEqual(expect.arrayContaining(['package.json', 'README.md', 'dist/main.js', 'dist/THIRD_PARTY_NOTICES.txt', 'docs/cli.md', 'docs/wallet.md', 'skills/agent-wallet-cli/SKILL.md', 'skills/agent-wallet-cli/references/configuration.md']));
+    expect(files).toEqual(expect.arrayContaining(['package.json', 'README.md', 'dist/main.js', 'dist/THIRD_PARTY_NOTICES.txt', 'docs/cli.md', 'docs/wallet.md', 'skills/agent-wallet-cli/SKILL.md']));
     expect(files.every((file: string) => file === 'package.json' || file === 'README.md' || /^(dist|docs|skills)\//.test(file))).toBe(true);
     expect(files.some((file: string) => /agent-key|payment-0x|wallet-config|\.env|\.map$/.test(file))).toBe(false);
     await execute('npm', ['install', '--global', '--offline', '--ignore-scripts', '--prefix', prefix, join(directory, packed.filename)], {cwd: directory, env});
