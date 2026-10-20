@@ -3,7 +3,7 @@
 *{box-sizing:border-box}body{margin:0}button,a{-webkit-tap-highlight-color:transparent}a{color:inherit}
 button{font:inherit;font-weight:600;cursor:pointer;border:1px solid #ccd5cd;border-radius:8px;background:transparent;padding:12px 18px;color:#173a2e;min-height:44px}
 button:hover:not(:disabled){background:#e5eadf}button:disabled{opacity:.45;cursor:not-allowed}
-button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #568c32;outline-offset:3px}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #568c32;outline-offset:3px}
 .primary{background:#194c36;color:#fff;border-color:#194c36}.primary:hover:not(:disabled){background:#226346}
 .shell{max-width:1160px;margin:auto;padding:0 44px}
 header{display:flex;align-items:center;justify-content:space-between;padding:28px 0;border-bottom:1px solid #dbe1d6}
@@ -32,3 +32,4 @@ footer{display:flex;justify-content:space-between;align-items:start;gap:20px;mar
 .input-address{font:10px/1.6 "IBM Plex Mono",monospace;overflow-wrap:anywhere;color:#69796c}
 
 pre{overflow-x:auto;max-width:100%;padding:16px;border:1px solid #dbe1d6;border-radius:8px;background:#f8faf4;font:11px/1.8 'IBM Plex Mono',monospace}code{font-family:'IBM Plex Mono',monospace;font-size:.9em}
+.setup-steps{padding-left:20px;color:#546b51;font-size:13px;line-height:1.8;margin:20px 0}.create-panel .actions>a{align-self:center;font-size:13px;padding:10px 0}.setup-prompt summary{cursor:pointer;font-size:13px;color:#546b51;padding:10px 0;min-height:44px}.setup-prompt textarea{display:block;width:100%;max-width:100%;resize:vertical;margin-top:8px;border:1px solid #ccd5cd;border-radius:8px;padding:14px;background:#f8faf4;color:#173a2e;font:12px/1.7 'IBM Plex Mono',monospace}#agent-allowance{scroll-margin-top:24px}

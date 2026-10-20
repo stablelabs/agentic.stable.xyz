@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { BaseError, createWalletClient, custom, formatUnits, type Address } from 'viem';
-import { address, chain, CHAIN_ID, EXPLORER, identifier, validateConfig, formatAmount, publicClient, createOwnerClient, type OwnerOperation, type WalletConfig } from '../../shared/owner.js';
+import { address, chain, CHAIN_ID, EXPLORER, identifier, validateConfig, parseAmount, formatAmount, publicClient, createOwnerClient, type OwnerOperation, type WalletConfig } from '../../shared/owner.js';
 import { metaMask, type Provider } from './metamask';
 
 const failure = (error: unknown) => error instanceof BaseError ? error.shortMessage : error instanceof Error ? error.message : 'Request failed.';
 const operationKey = (config: WalletConfig) => `stable-token-allowance:v2:${config.alice.toLowerCase()}:${config.token.toLowerCase()}:operation`;
 const unresolved = (op?: OwnerOperation) => !!op && ['prepared', 'submitted', 'unknown'].includes(op.status);
+const skillUrl = 'https://raw.githubusercontent.com/stablelabs/agentic.stable.xyz/refs/heads/main/skills/agent-wallet-cli/SKILL.md';
+const skillPageUrl = 'https://github.com/stablelabs/agentic.stable.xyz/blob/main/skills/agent-wallet-cli/SKILL.md';
 export default function App() {
   const refreshId = useRef(0);
   const activeOwner = useRef<string | undefined>(undefined);
@@ -28,8 +30,27 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [operation, setOperation] = useState<OwnerOperation>();
   const [recoveredHash, setRecoveredHash] = useState('');
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [promptCopyError, setPromptCopyError] = useState('');
   const pending = unresolved(operation);
   const connected = verified && account?.toLowerCase() === config?.alice.toLowerCase();
+  let setupPrompt = '';
+  if (connected && config) {
+    try {
+      const budget = formatAmount(parseAmount(amount));
+      const settings = validateConfig({ ...config, defaultAgent: undefined, approvalUrl: new URL(location.pathname, location.origin).href });
+      setupPrompt = `Read and follow this skill, including its linked references (resolve relative links against the skill URL):
+${skillUrl}
+
+Set up an agent wallet for my connected MetaMask owner address ${settings.alice} on Stable Testnet (chain 2201). Reuse an existing signer if available, following the skill's identity checks.
+
+Use these public wallet settings. Save them to a local JSON file and import them as described in the skill:
+${JSON.stringify(settings, null, 2)}
+
+Return an approval link requesting ${budget} USDT0 allowance, with your agent signer address prefilled, so I can approve and fund its gas in MetaMask. Keep your signer private key in your agent environment. Never request my MetaMask private key. Stop before making any payment.`;
+    } catch { /* An invalid allowance cannot become an instruction to the agent. */ }
+  }
+  useEffect(() => { setPromptCopied(false); setPromptCopyError(''); }, [setupPrompt]);
 
   useEffect(() => {
     fetch('/wallet-config.json', { cache: 'no-store' }).then(async response => {
@@ -129,6 +150,16 @@ export default function App() {
     const link = document.createElement('a'); link.href = url; link.download = 'wallet-config.json'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  async function copySetupPrompt() {
+    if (!setupPrompt) return;
+    const revision = connectionId.current;
+    try {
+      await navigator.clipboard.writeText(setupPrompt);
+      if (revision === connectionId.current) { setPromptCopied(true); setPromptCopyError(''); }
+    } catch {
+      if (revision === connectionId.current) { setPromptCopied(false); setPromptCopyError('Clipboard access is blocked. Open the setup prompt below, select the text, and copy it into your agent app.'); }
+    }
+  }
   async function ownerClient() {
     if (!config || !provider || !account) throw new Error('Connect the wallet owner in MetaMask first.');
     const accounts = await provider.request({ method: 'eth_accounts' });
@@ -178,8 +209,16 @@ export default function App() {
         {operation!.hash ? <button disabled={busy} onClick={() => void reconcile()}>Check confirmation</button>
           : <form onSubmit={event => void reconcile(event)}><label>Transaction hash from MetaMask<input required value={recoveredHash} onChange={e => setRecoveredHash(e.target.value)} placeholder="0x…" /></label><button disabled={busy} type="submit">Verify transaction</button><p>If MetaMask shows that nothing was submitted, retain this record and resolve it before continuing. Do not send another transaction to recover an unknown outcome.</p></form>}
       </section>}
+      <section className="create-panel" aria-label="Set up your agent">
+        <p className="eyebrow">CONNECT YOUR AGENT</p><h2>Set up your agent</h2>
+        <p className="form-note">Copy the setup prompt into your agent app. It will use the GitHub skill to set up its wallet and return a link with its address and allowance filled in. Your MetaMask private key stays with you.</p>
+        <ol className="setup-steps"><li>Copy the prompt and paste it into an agent with terminal access.</li><li>Let your agent handle setup, then open the approval link it returns.</li><li>Connect MetaMask on that page, review the allowance, and fund the agent’s gas.</li></ol>
+        <div className="actions"><button className="primary" disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>{promptCopied ? 'Setup prompt copied' : 'Copy setup prompt'}</button><a href={skillPageUrl} target="_blank" rel="noreferrer">View skill ↗</a><a href="#agent-allowance">I already have an agent address ↓</a></div>
+        <p className="form-note" aria-live="polite">{!connected ? 'Connect MetaMask above to include your wallet’s public settings.' : !setupPrompt ? 'Enter a valid allowance amount below to generate the setup prompt.' : promptCopyError || (promptCopied ? 'Paste the prompt into your agent app. When setup finishes, open the approval link it returns.' : 'The prompt includes your public wallet settings and the allowance amount below. Setup does not send a payment.')}</p>
+        {setupPrompt && <details className="setup-prompt" open={promptCopyError ? true : undefined}><summary>View or manually copy setup prompt</summary><textarea aria-label="Agent setup prompt" readOnly value={setupPrompt} rows={12} onFocus={event => event.currentTarget.select()} /></details>}
+      </section>
       <section className="message"><strong>What this permission allows</strong><p>The agent can send up to its remaining allowance to any recipient. There is no automatic expiry. Revoke the allowance to stop future spending; confirmed payments cannot be undone.</p></section>
-      <form className="create-panel" aria-label="Approve agent" onSubmit={event => { event.preventDefault(); void submit('approve'); }}>
+      <form id="agent-allowance" className="create-panel" aria-label="Approve agent" onSubmit={event => { event.preventDefault(); void submit('approve'); }}>
         <p className="eyebrow">APPROVE YOUR AGENT</p><h2>Set a token allowance</h2><p className="form-note">Approve the agent’s own address on the USDT0 token. Funds stay in the owner’s wallet until the agent spends them.</p>
         <div className="form-grid"><label>Agent signer<input aria-label="Agent signer" required value={agent} onChange={e => setAgent(e.target.value)} disabled={busy || pending} placeholder="0x…" autoComplete="off" spellCheck={false} />{agent && <small className="input-address">{agent}</small>}</label>
           <label>Allowance amount (USDT0)<input required inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} disabled={busy || pending} /></label></div>
