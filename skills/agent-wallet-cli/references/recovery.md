@@ -36,7 +36,7 @@ Apply this with the same absolute `STATE_DIR` and original `PAYMENT_ID` establis
 | `PAYMENT_OUTCOME_UNKNOWN` | Keep ID/hash. Use `payments wait`, then authorized `payments resume` if needed. A timeout or process exit does not prove no transfer happened. |
 | `PAYMENT_UNVERIFIED` | Exact payment evidence is missing or differs. Inspect the same transaction and preserve its journal. Do not claim success or create a duplicate. |
 | `PAYMENT_REVERTED` | Report the included failure and any returned fee/hash. Follow the reverted-state guidance above. |
-| `RPC_UNAVAILABLE` / `ALLOWANCE_TIMEOUT` | Retry a read-only check a bounded number of times. Do not infer a transaction failed or change network to bypass verification. |
+| `RPC_UNAVAILABLE` / `ALLOWANCE_TIMEOUT` | Retry a read-only check a bounded number of times. For an explicit network-policy denial (such as a proxy 403), report the blocked RPC hostname and stop; the user needs permitted RPC access in this environment or another environment. Preserve existing signer state. Do not infer a transaction failed or change network to bypass verification. |
 | `STATE_LOCKED` | Another command may be active. Verify the actual process ended before treating a lock as stale. Never remove locks automatically on a timer. |
 
 If permission modes alone are wrong, adjust only the known private directory/file after inspecting the issue; do not recursively change unrelated directories or expose contents. If identity or journal integrity is unclear, stop signing and report the blocker.

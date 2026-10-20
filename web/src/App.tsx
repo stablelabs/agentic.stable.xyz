@@ -44,6 +44,8 @@ ${skillUrl}
 
 Set up an agent wallet for my connected MetaMask owner address ${settings.alice} on Stable Testnet (chain 2201). Reuse an existing signer if available, following the skill's identity checks.
 
+Before creating a new signer, verify that your environment can reach the configured RPC by importing the public settings below. If RPC access is blocked, stop and report the hostname that needs network access. Preserve any existing signer. Do not ask me to approve or fund an unusable signer, and do not claim that a temporary chat workspace is durable storage.
+
 Use these public wallet settings. Save them to a local JSON file and import them as described in the skill:
 ${JSON.stringify(settings, null, 2)}
 
@@ -213,6 +215,7 @@ Return an approval link requesting ${budget} USDT0 allowance, with your agent si
         <p className="eyebrow">CONNECT YOUR AGENT</p><h2>Set up your agent</h2>
         <p className="form-note">Copy the setup prompt into your agent app. It will use the GitHub skill to set up its wallet and return a link with its address and allowance filled in. Your MetaMask private key stays with you.</p>
         <ol className="setup-steps"><li>Copy the prompt and paste it into an agent with terminal access.</li><li>Let your agent handle setup, then open the approval link it returns.</li><li>Connect MetaMask on that page, review the allowance, and fund the agent’s gas.</li></ol>
+        <p className="form-note">Your agent needs access to Stable Testnet. Restricted chat workspaces may need network access enabled for <code>{config ? new URL(config.rpcUrl).hostname : 'rpc.testnet.stable.xyz'}</code> before setup can finish.</p>
         <div className="actions"><button className="primary" disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>{promptCopied ? 'Setup prompt copied' : 'Copy setup prompt'}</button><a href={skillPageUrl} target="_blank" rel="noreferrer">View skill ↗</a><a href="#agent-allowance">I already have an agent address ↓</a></div>
         <p className="form-note" aria-live="polite">{!connected ? 'Connect MetaMask above to include your wallet’s public settings.' : !setupPrompt ? 'Enter a valid allowance amount below to generate the setup prompt.' : promptCopyError || (promptCopied ? 'Paste the prompt into your agent app. When setup finishes, open the approval link it returns.' : 'The prompt includes your public wallet settings and the allowance amount below. Setup does not send a payment.')}</p>
         {setupPrompt && <details className="setup-prompt" open={promptCopyError ? true : undefined}><summary>View or manually copy setup prompt</summary><textarea aria-label="Agent setup prompt" readOnly value={setupPrompt} rows={12} onFocus={event => event.currentTarget.select()} /></details>}

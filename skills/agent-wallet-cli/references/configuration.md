@@ -23,3 +23,5 @@ agent-wallet config show --state-dir "$STATE_DIR" --json
 ```
 
 Config import checks Stable Testnet and USDT0 metadata. It does not authorize a payment, approve allowance, or fund gas. The JSON contains no private keys. Do not put secrets in it or replace the owner's address with a sample to bypass a mismatch.
+
+Import does not require a signer, so run it before creating a new identity. GitHub/npm access alone does not establish RPC access. If the environment blocks the configured RPC, stop setup before generating a key or requesting approval/gas. Preserve any existing state and report the hostname that needs network access. A local approval URL cannot establish payment readiness.

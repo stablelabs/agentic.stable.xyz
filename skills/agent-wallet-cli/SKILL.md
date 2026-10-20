@@ -31,17 +31,24 @@ agent-wallet config show --state-dir "$STATE_DIR" --json
 
 Match the returned address to the intended approved spender. `defaultAgent` in public configuration is only a browser prefill; the stored signer determines CLI identity. `whoami` shows public identity; `doctor` also verifies the key and journal consistency.
 
-For a genuinely new signer, run `init --state-dir "$STATE_DIR" --json`, then record its public address. `init` retains an existing key. Do not use a fresh directory or key to fix a configuration or transaction error.
-
 Import operator-provided **public** settings when missing:
 
 ```sh
 agent-wallet config import --file "$CONFIG_FILE" --state-dir "$STATE_DIR" --json
+```
+
+Set `CONFIG_FILE` to an operator-provided public JSON file. Check the owner (`alice` is its legacy field name), token, network, and approval URL against the user's intended setup. If settings do not exist, create the public schema described in [configuration reference](references/configuration.md) using the actual owner and approval page. Do not silently use a sample or deployment owner. Config import verifies chain/token and does not grant spending permission.
+
+For a new setup, complete this network check **before creating a signer**. A hosted chat workspace may allow GitHub/npm while blocking the configured RPC. If import fails because network access is denied, report the blocked RPC hostname and stop setup. The workspace needs permission to reach that RPC, or the user needs an agent environment with that access. Do not change RPCs to work around an access policy, create another signer, or ask the owner to approve/fund a signer that cannot operate. Keep any existing signer and state intact. Do not promise a chat workspace's files will persist across sessions; use storage whose persistence the environment actually supports.
+
+After network verification succeeds, for a genuinely new signer run `init --state-dir "$STATE_DIR" --json`, then record its public address. `init` retains an existing key. Do not use a fresh directory or key to fix a configuration or transaction error. For both new and existing configured signers, verify readiness before returning the approval link:
+
+```sh
 agent-wallet doctor --state-dir "$STATE_DIR" --json
 agent-wallet status --state-dir "$STATE_DIR" --json
 ```
 
-Set `CONFIG_FILE` to an operator-provided public JSON file. Check the owner (`alice` is its legacy field name), token, network, and approval URL against the user's intended setup. If settings do not exist, create the public schema described in [configuration reference](references/configuration.md) using the actual owner and approval page. Do not silently use a sample or deployment owner. Config import verifies chain/token and does not grant spending permission.
+If network readiness is blocked, report that blocker instead of presenting setup as complete. `allowance link` constructs a URL locally from imported settings; a link is not proof that this environment can read the chain or make a payment.
 
 This CLI supports **Stable Testnet, chain 2201**, and USDT0 at `0x78Cf24370174180738C5B8E352B6D14c83a6c9A9`. Token amounts have **6 decimals**; native gas amounts have **18 decimals**. Never round a payment to make it fit. Use decimal strings and integer arithmetic for atomic amounts, not floating point.
 
