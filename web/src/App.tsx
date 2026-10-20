@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { BaseError, createWalletClient, custom, formatUnits, type Address } from 'viem';
 import { address, chain, CHAIN_ID, EXPLORER, identifier, validateConfig, parseAmount, formatAmount, publicClient, createOwnerClient, type OwnerOperation, type WalletConfig } from '../../shared/owner.js';
 import { metaMask, type Provider } from './metamask';
+import { PaymentStep } from './PaymentStep';
 
 const failure = (error: unknown) => error instanceof BaseError ? error.shortMessage : error instanceof Error ? error.message : 'Request failed.';
 const operationKey = (config: WalletConfig) => `stable-token-allowance:v2:${config.alice.toLowerCase()}:${config.token.toLowerCase()}:operation`;
@@ -239,8 +240,9 @@ I will review and approve in MetaMask; the browser handles its network checks. C
         <label>Gas top-up (native USDT0)<input required inputMode="decimal" value={gasAmount} onChange={e => setGasAmount(e.target.value)} disabled={busy || pending} /></label>
         <button className="primary" type="submit" disabled={!connected || !storageReady || busy || pending || allowance === undefined}>Fund agent gas</button>
       </form>
+      <PaymentStep config={connected ? config : undefined} agent={agent} allowance={allowance} ownerBalance={ownerBalance} gasBalance={gasBalance} blocked={busy || pending || !storageReady} />
       <section className="create-panel" aria-label="Send an agent payment">
-        <p className="eyebrow">NEXT: PAY FROM THE AGENT</p><h2>Use the agent CLI</h2>
+        <p className="eyebrow">MANUAL OPTION</p><h2>Use the agent CLI</h2>
         <p className="form-note">With Node.js 22+, install the standalone CLI. For a new signer, run <code>agent-wallet init --json</code> in your chosen state directory, then paste its address into Agent signer above. Reuse your existing state directory if you already have a signer. Check that <code>whoami</code> prints the same agent address shown above.</p>
         <button disabled={!connected || busy} onClick={() => { try { downloadConfig(); } catch (e) { setError(failure(e)); } }}>Download wallet settings</button>
         <p className="form-note">Connect MetaMask to download public settings for your wallet, then import that downloaded file below. Your private key stays in MetaMask.</p>
