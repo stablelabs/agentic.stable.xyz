@@ -30,16 +30,16 @@ export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
 agent-wallet init --json
 ```
 
-`init` returns the signer address. If a key already exists, it keeps that key. Share the address with the owner as an approval link, for example `https://agentic.stable.xyz/?agent=AGENT_ADDRESS&amount=0.01`. The owner approves the agent and funds its gas on that page.
+`init` returns the signer address. If a key already exists, it keeps that key.
 
-Before running balance, allowance, or payment commands, import public settings. Get them from the approval page's **Download wallet settings** button or the operator, or write them using the [public configuration schema](docs/wallet.md#public-configuration):
+Next, import public settings and generate the owner's approval link. Both steps are local too; the network and token are checked when a balance, allowance, or payment command first runs. Get the settings from the approval page's **Download wallet settings** button or the operator, or write them using the [public configuration schema](docs/wallet.md#public-configuration):
 
 ```sh
 agent-wallet config import --file /absolute/path/wallet-config.json --json
 agent-wallet allowance link --amount 0.01 --json
 ```
 
-For an existing signer, set `WALLET_STATE_DIR` to its **original absolute state directory**. Installing the package doesn't move keys or journals. If no state directory is set, the CLI uses one relative to the current working directory. The approval page must use the same owner as the settings.
+Share `data.approvalUrl` with the owner. They approve the agent and fund its gas on that page. For an existing signer, set `WALLET_STATE_DIR` to its **original absolute state directory**. Installing the package doesn't move keys or journals. If no state directory is set, the CLI uses one relative to the current working directory. The approval page must use the same owner as the settings.
 
 ## Run the demo
 
