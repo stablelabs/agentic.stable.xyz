@@ -23,17 +23,23 @@ agent-wallet --help --json
 
 The package bundles its runtime, docs, and agent skill; agents do not need to clone this repo or install an SDK. Pin this version: 0.1.x uses the retired contract-grant flow. For an operator-provided tarball produced by `npm run pack:cli`, install it with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz`.
 
-For a new signer:
+Create a signer. This step is local and needs no network access:
 
 ```sh
 export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
 agent-wallet init --json
-agent-wallet whoami --json
+```
+
+`init` returns the signer address. If a key already exists, it keeps that key. Share the address with the owner as an approval link, for example `https://agentic.stable.xyz/?agent=AGENT_ADDRESS&amount=0.01`. The owner approves the agent and funds its gas on that page.
+
+Before running balance, allowance, or payment commands, import public settings. Get them from the approval page's **Download wallet settings** button or the operator, or write them using the [public configuration schema](docs/wallet.md#public-configuration):
+
+```sh
 agent-wallet config import --file /absolute/path/wallet-config.json --json
 agent-wallet allowance link --amount 0.01 --json
 ```
 
-For an existing signer, use its **original absolute state directory** instead. Installation does not move keys or journals, and the CLI's default directory remains relative to the working directory. Obtain public settings from the operator or create them using the [public configuration schema](skills/agent-wallet-cli/references/configuration.md). The approval page must use the same owner. Share the returned approval link with the owner to approve the agent and fund its gas separately.
+For an existing signer, set `WALLET_STATE_DIR` to its **original absolute state directory**. Installing the package doesn't move keys or journals. If no state directory is set, the CLI uses one relative to the current working directory. The approval page must use the same owner as the settings.
 
 ## Run the demo
 
