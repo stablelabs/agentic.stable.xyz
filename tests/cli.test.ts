@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
+import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -25,6 +26,33 @@ it('generates a retained signer and an approval link addressed to that signer', 
   const link = new URL((await run('allowance', 'link', '--amount', '0.01')).data.approvalUrl);
   expect(link.searchParams.get('agent')).toBe(initialized.data.address); expect(link.searchParams.get('amount')).toBe('0.01');
   expect([...link.searchParams.keys()].sort()).toEqual(['agent', 'amount']);
+});
+it('imports public settings and links an approval without contacting the RPC', async () => {
+  const { run, state, initialized, config } = await fixture();
+  // A wrong-chain RPC records every request: import and link must make none.
+  const methods: string[] = [];
+  const server = createServer((req, res) => {
+    let body = ''; req.on('data', chunk => { body += chunk; });
+    req.on('end', () => { const { id, method } = JSON.parse(body); methods.push(method); res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ jsonrpc: '2.0', id, result: '0x1' })); });
+  });
+  await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
+  try {
+    const file = resolve(state, '..', 'public-config.json');
+    await writeFile(file, JSON.stringify({ ...config, rpcUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}` }));
+    expect((await run('config', 'import', '--file', file)).data).toMatchObject({ alice: config.alice, token: config.token });
+    const link = new URL((await run('allowance', 'link', '--amount', '0.01')).data.approvalUrl);
+    expect(link.searchParams.get('agent')).toBe(initialized.data.address);
+    expect(methods).toEqual([]);
+    // Every onchain command still refuses an RPC that is not Stable Testnet.
+    const recipient = '0x3333333333333333333333333333333333333333';
+    const payment = (await run('payments', 'prepare', '--recipient', recipient, '--amount', '0.001')).data;
+    for (const args of [['status'], ['allowance', 'show'], ['allowance', 'wait', '--amount', '0.01', '--timeout', '1s'], ['gas', 'check', '--recipient', recipient, '--amount', '0.001'], ['pay', '--payment-id', payment.paymentId, '--dry-run']]) {
+      const failure = await run(...args).then(() => undefined, (error: { stdout: string }) => JSON.parse(error.stdout));
+      expect(failure?.error, args.join(' ')).toMatchObject({ code: 'ACCOUNT_NOT_VERIFIED', message: 'RPC is not Stable Testnet (2201).' });
+    }
+    expect(methods.length).toBeGreaterThan(0); expect(new Set(methods)).toEqual(new Set(['eth_chainId']));
+    expect((await run('doctor')).data.checks.find((check: { name: string }) => check.name === 'network')).toMatchObject({ ok: false, code: 'ACCOUNT_NOT_VERIFIED' });
+  } finally { await new Promise<void>(done => server.close(() => done())); }
 });
 it('prepares immutable local payment terms without requiring a grant or RPC', async () => {
   const { run, state, initialized, config } = await fixture();

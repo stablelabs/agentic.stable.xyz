@@ -31,7 +31,7 @@ Standalone CLI users obtain public JSON from the operator or create it with the 
 }
 ```
 
-Replace `OWNER_ADDRESS` with the account you connect in MetaMask. The web app accepts any visitor’s MetaMask account and uses it as the wallet owner for balances, approvals, revocations, and gas funding. It adds or switches to Stable Testnet during connection. You can also connect and use **Download wallet settings** to get public JSON containing your account and the selected agent address. Import with `agent-wallet config import --file /absolute/path/wallet-config.json --json` using the same state directory as `init`. Configuration does not approve allowance or transfer funds.
+Replace `OWNER_ADDRESS` with the account you connect in MetaMask. The web app accepts any visitor’s MetaMask account and uses it as the wallet owner for balances, approvals, revocations, and gas funding. It adds or switches to Stable Testnet during connection. You can also connect and use **Download wallet settings** to get public JSON containing your account and the selected agent address. Import with `agent-wallet config import --file /absolute/path/wallet-config.json --json` using the same state directory as `init`. Import is local: it doesn't contact the RPC, approve allowance, or transfer funds. Onchain commands check the network and token before they read or sign.
 
 For web-app operators with a checkout, `npm run wallet:configure -- --owner ADDRESS --agent ADDRESS` verifies the public network/token and writes `web/public/wallet-config.json`. Options include `--rpc URL`, `--approval-url URL`, and `--output FILE`.
 

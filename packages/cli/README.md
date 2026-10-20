@@ -25,9 +25,9 @@ export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
 agent-wallet init --json
 ```
 
-`init` is local. It returns the signer address and keeps any existing key. Send the owner an approval link, for example `https://agentic.stable.xyz/?agent=AGENT_ADDRESS&amount=0.01`. For an existing signer, set `WALLET_STATE_DIR` to its original absolute directory. Never replace a key to fix missing configuration.
+`init` is local. It returns the signer address and keeps any existing key. For an existing signer, set `WALLET_STATE_DIR` to its original absolute directory. Never replace a key to fix missing configuration.
 
-Before running onchain commands, import public settings. Get them from the approval page's **Download wallet settings** button or the operator, or write them using the actual owner address and approval page:
+Next, import public settings and generate the owner's approval link. Both steps are local and need no RPC access. Get them from the approval page's **Download wallet settings** button or the operator, or write them using the actual owner address and approval page:
 
 ```json
 {
@@ -45,7 +45,7 @@ agent-wallet config import --file /absolute/path/wallet-config.json --json
 agent-wallet allowance link --amount 0.01 --json
 ```
 
-Replace `OWNER_ADDRESS` before importing. The hosted approval page must use that same owner. Config import checks the network and token, but it doesn't approve spending. Share the returned approval link with the owner; they approve the agent directly on the token and fund its native gas separately in their wallet. The allowance permits any recipient and has no expiry. The owner can revoke the remainder with `approve(agent, 0)`.
+Replace `OWNER_ADDRESS` before importing. The hosted approval page must use that same owner. Config import only validates and saves the settings: it doesn't contact the RPC or approve spending. Onchain commands check the network and token before they read or sign. Share the returned approval link with the owner; they approve the agent directly on the token and fund its native gas separately in their wallet. The allowance permits any recipient and has no expiry. The owner can revoke the remainder with `approve(agent, 0)`.
 
 ## Pay and recover
 

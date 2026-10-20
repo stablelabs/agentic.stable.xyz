@@ -269,11 +269,11 @@ test('copies the signer setup prompt for the connected visitor and resets after 
   expect(prompt).toContain(other);
   expect(prompt).not.toContain(alice);
   expect(prompt).not.toContain('defaultAgent');
-  const approvalLink = new URL('/', page.url());
-  approvalLink.searchParams.set('agent', 'AGENT_SIGNER_ADDRESS');
-  approvalLink.searchParams.set('amount', '0.025');
-  expect(prompt).toContain(approvalLink.href);
+  const settings = JSON.parse(prompt.split('\n').find(line => line.startsWith('{'))!);
+  expect(settings).toMatchObject({ schemaVersion: 2, chainId: 2201, alice: other, approvalUrl: new URL('/', page.url()).href });
+  expect(prompt).toContain('allowance link --amount 0.025');
   expect(prompt).toContain('requesting 0.025 USDT0 allowance');
+  expect(prompt).not.toContain('AGENT_SIGNER_ADDRESS');
   expect(prompt).toContain('Stop before making any payment.');
   expect(submissions).toHaveLength(0);
   await page.evaluate(alice => (window as any).walletTestSwitch(alice), alice);

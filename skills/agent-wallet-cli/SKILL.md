@@ -29,31 +29,28 @@ To choose `STATE_DIR`, use the path the user gave. If there is none, use `$WALLE
 
 ## Set up a signer (local only, no network)
 
+Setup is three local commands: `init`, `config import` and `allowance link`. None of them contacts the RPC.
+
 ```sh
 agent-wallet init --state-dir "$STATE_DIR" --json
 ```
 
 `data.address` is the signer's address. If a key already exists, `init` keeps it and returns `data.retained: true`.
 
-Next, build the approval link. Start from the page the user gave you and set the `agent` and `amount` query parameters, for example `https://agentic.stable.xyz/?agent=0xABC…&amount=0.01`. If you were given a URL template, replace only the address placeholder.
-
-Return the address and the link, then stop. Setup doesn't need `config import`, `doctor`, `status` or `allowance link`, because those require settings or network access.
-
-## Configure (once per state directory, before any onchain command)
-
-Get the public settings JSON from the operator or from the approval page's **Download wallet settings** button. You can also write it yourself, setting `alice` to the owner's address:
+Next, import the owner's public settings. Use the settings JSON the user or operator gave you, or the file from the approval page's **Download wallet settings** button. If you were given only the owner's address and approval page, write the file yourself:
 
 ```json
 {"schemaVersion": 2, "chainId": 2201, "rpcUrl": "https://rpc.testnet.stable.xyz",
  "token": "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9", "alice": "OWNER_ADDRESS",
- "approvalUrl": "https://agentic.stable.xyz"}
+ "approvalUrl": "APPROVAL_PAGE"}
 ```
 
 ```sh
 agent-wallet config import --file "$CONFIG_FILE" --state-dir "$STATE_DIR" --json
+agent-wallet allowance link --amount "$AMOUNT" --state-dir "$STATE_DIR" --json
 ```
 
-Import contacts the RPC. If it's blocked, report the hostname and stop. Don't switch to a different RPC.
+Return `data.agent` and `data.approvalUrl` from `allowance link`, then stop. Setup doesn't need `doctor` or `status`, which use the network. If you don't have the owner's address, return the signer address and ask for it.
 
 ## Check readiness
 
@@ -103,7 +100,7 @@ agent-wallet payments resume "$PAYMENT_ID" --state-dir "$STATE_DIR" --json
 
 | `error.code` | What to do |
 | --- | --- |
-| `CONFIG_REQUIRED` | For setup, ignore it and build the link by hand. Otherwise, import the settings. |
+| `CONFIG_REQUIRED` | Import the owner's settings (see Set up a signer). |
 | `AGENT_REQUIRED` | You probably have the wrong `STATE_DIR`, so find the right one. Run `init` only if you really need a new signer. |
 | `INSUFFICIENT_ALLOWANCE` | Send the owner the `allowance link` URL, then rerun the same ID. |
 | `INSUFFICIENT_PAYMENT_FUNDS` | The owner needs more USDT0 (https://faucet.stable.xyz). |
@@ -111,6 +108,7 @@ agent-wallet payments resume "$PAYMENT_ID" --state-dir "$STATE_DIR" --json
 | `UNRESOLVED_PAYMENT` | An earlier payment isn't settled yet. Run `payments wait` on the ID in `data.paymentId` first. |
 | `PAYMENT_OUTCOME_UNKNOWN` | Follow the Recover section with the same ID. |
 | `PAYMENT_REVERTED`, `PAYMENT_UNVERIFIED` | Report the ID and hash. Don't retry automatically. |
+| `ACCOUNT_NOT_VERIFIED` | The RPC in the settings isn't Stable Testnet or its USDT0 doesn't match. Report it and stop. Don't switch to a different RPC on your own. |
 | `RPC_UNAVAILABLE` | Retry read-only checks a few times. If a policy blocks the RPC, report the host and stop. |
 | `STATE_LOCKED` | Another command is still running. Wait for it, and never delete the lock while that process is alive. |
 | Anything else | Stop and report it. Don't edit, delete or replace any state. |
