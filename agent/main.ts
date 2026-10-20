@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
-import { address, identifier, validateConfig, readBalances, readAllowance, publicClient, parseAmount, fundingSuggestion, paymentGasReserve, duration, input, WalletError } from '../shared/protocol.js';
+import { address, identifier, validateConfig, readBalances, readAllowance, parseAmount, fundingSuggestion, paymentGasReserve, duration, input, WalletError } from '../shared/protocol.js';
 import { AgentContext } from './context.js';
 import { listPayments, loadPayment, pay, paymentView, preparePayment, waitPayment } from './payments.js';
 import { publicError, render } from './output.js';
@@ -87,7 +87,8 @@ try {
             const previous = await ctx.config();
             if (previous.alice !== config.alice || previous.token !== config.token || previous.rpcUrl !== config.rpcUrl) throw new WalletError('CONFIG_IN_USE', 'Payment records bind this directory to its owner, token and RPC. Use a separate state directory.');
           }
-          await ctx.verify(publicClient(config.rpcUrl), config); await ctx.state.write('config.json', config); return config;
+          // Import stays local; every onchain command verifies the network before it reads or signs.
+          await ctx.state.write('config.json', config); return config;
         }); break;
       }
       case 'doctor': {

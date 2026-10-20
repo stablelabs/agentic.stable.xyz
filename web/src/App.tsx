@@ -39,15 +39,12 @@ export default function App() {
     try {
       const budget = formatAmount(parseAmount(amount));
       const settings = validateConfig({ ...config, defaultAgent: undefined, approvalUrl: new URL(location.pathname, location.origin).href });
-      const approvalLink = new URL(settings.approvalUrl);
-      approvalLink.searchParams.set('agent', 'AGENT_SIGNER_ADDRESS');
-      approvalLink.searchParams.set('amount', budget);
       setupPrompt = `Use the agent-wallet-cli skill at ${skillUrl} and follow its "Set up a signer" section.
 
-My MetaMask owner address on Stable Testnet (chain 2201) is ${settings.alice}. Save it so you can configure payments later.
+My MetaMask owner address on Stable Testnet (chain 2201) is ${settings.alice} and my approval page is ${settings.approvalUrl}. Save these public wallet settings as a JSON file and import them with config import:
+${JSON.stringify(settings)}
 
-Create or reuse a signer, then return its address and an approval link requesting ${budget} USDT0 allowance. To build the link, replace AGENT_SIGNER_ADDRESS in this URL with the address that init returns:
-${approvalLink.href}
+Create or reuse a signer, import the settings, then run allowance link --amount ${budget}. Return the signer address and the approval link requesting ${budget} USDT0 allowance that it prints. Setup is local and needs no network access.
 
 Tell me if your storage might not persist between sessions. Stop before making any payment.`;
     } catch { /* An invalid allowance cannot become an instruction to the agent. */ }
