@@ -61,6 +61,8 @@ Replace the recipient with the intended wallet. `pay` checks balance, allowance 
 
 Do not substitute 0.1.x, which uses the retired contract-grant flow. Retain old signer state and the matching historical tool for legacy recovery; read the [migration notes](docs/wallet.md#migration).
 
+<a id="run-the-demo"></a>
+
 ## Develop locally
 
 Run these commands from a clean checkout with Node.js 22.12+ and npm:
