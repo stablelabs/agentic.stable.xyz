@@ -55,23 +55,18 @@ export function PaymentStep({
   }
 
   let issue = '';
-  if (!config) issue = 'Connect MetaMask above to use your wallet and agent.';
+  if (!config) issue = 'Connect MetaMask.';
   else if (!selectedAgent || selectedAgent.toLowerCase() === config.alice.toLowerCase())
-    issue = 'Enter your agent’s separate signer address above.';
-  else if (blocked)
-    issue =
-      blockedReason || 'Resolve any pending wallet operation before preparing a payment prompt.';
+    issue = 'Set a separate agent signer in step 2.';
+  else if (blocked) issue = blockedReason || 'Resolve the pending wallet transaction.';
   else if (allowance === undefined || ownerBalance === undefined || gasBalance === undefined)
-    issue = 'Waiting for the wallet balances and allowance. Refresh above if needed.';
-  else if (allowance === 0n) issue = 'Approve your agent’s token allowance above first.';
-  else if (gasBalance === 0n) issue = 'Fund your agent’s gas above first.';
-  else if (!selectedRecipient) issue = 'Enter a valid, nonzero recipient address.';
-  else if (paymentAmount === undefined)
-    issue = 'Enter a positive USDT0 amount with at most 6 decimal places.';
-  else if (paymentAmount > allowance)
-    issue = 'The payment exceeds your agent’s remaining allowance.';
-  else if (paymentAmount > ownerBalance)
-    issue = 'Your wallet does not have enough USDT0 for this payment.';
+    issue = 'Balances unavailable. Refresh.';
+  else if (allowance === 0n) issue = 'Approve an allowance in step 3.';
+  else if (gasBalance === 0n) issue = 'Fund gas in step 4.';
+  else if (!selectedRecipient) issue = 'Enter a nonzero recipient address.';
+  else if (paymentAmount === undefined) issue = 'Use a positive amount with at most 6 decimals.';
+  else if (paymentAmount > allowance) issue = 'Amount exceeds remaining allowance.';
+  else if (paymentAmount > ownerBalance) issue = 'Insufficient owner balance.';
 
   let prompt = '';
   if (!issue && config && selectedAgent && selectedRecipient && paymentAmount !== undefined) {
@@ -105,10 +100,9 @@ ${JSON.stringify(settings, null, 2)}`;
   }
 
   return (
-    <section className="payment-step" aria-label="Make your first payment">
+    <section className="payment-step" aria-label="Send payment">
       <p className="form-note">
-        Choose a recipient and amount, then paste the payment prompt into the same agent chat you
-        used for setup. Your agent will check, sign, and send the payment from your allowance.
+        Paste the payment prompt into the same agent chat. The agent signs and submits.
       </p>
       <form
         onSubmit={(event) => {
@@ -144,11 +138,11 @@ ${JSON.stringify(settings, null, 2)}`;
           </label>
         </div>
         <p id="recipient-help" className="field-error">
-          {recipient && !selectedRecipient ? 'Enter a valid, nonzero recipient address.' : ''}
+          {recipient && !selectedRecipient ? 'Enter a nonzero recipient address.' : ''}
         </p>
         <p id="payment-help" className="field-error">
           {amount && paymentAmount === undefined
-            ? 'Enter a positive amount with at most 6 decimal places.'
+            ? 'Use a positive amount with at most 6 decimals.'
             : ''}
         </p>
         {config && (
@@ -168,13 +162,13 @@ ${JSON.stringify(settings, null, 2)}`;
             (copyFailed
               ? 'Clipboard access is blocked. Select and copy the payment prompt below.'
               : copied
-                ? 'Paste into the same agent chat to request this payment. The agent will report its result there.'
-                : 'Copying does not move funds. Pasting this prompt asks your agent to send the specified payment.')}
+                ? 'Check the agent’s receipt.'
+                : 'Paste in your agent chat to authorize this payment.')}
         </p>
       </form>
       {prompt && (
         <details className="setup-prompt" open={copyFailed ? true : undefined}>
-          <summary>View or manually copy payment prompt</summary>
+          <summary>Payment prompt</summary>
           <Textarea
             aria-label="Agent payment prompt"
             readOnly
@@ -186,7 +180,7 @@ ${JSON.stringify(settings, null, 2)}`;
       )}
       {prompt && (
         <div className="payment-review">
-          <span>ONE PAYMENT · STABLE TESTNET</span>
+          <span>Payment</span>
           <p>
             <strong>{formatAmount(paymentAmount!)} USDT0</strong> to{' '}
             <code>{selectedRecipient}</code>
@@ -195,32 +189,19 @@ ${JSON.stringify(settings, null, 2)}`;
       )}
       {copied && (
         <div className="handoff-state">
-          <h3>Continue in your agent chat</h3>
-          <p>The prompt is copied. No payment has been sent by this page.</p>
-          <ol>
-            <li>Paste it into the same chat used for setup.</li>
-            <li>
-              Wait for your agent to report <code>confirmed</code>, with the payment ID and
-              transaction link.
-            </li>
-            <li>
-              Open that link to verify the recipient and amount. Check the remaining allowance here,
-              then revoke it in step 3 when you’re finished.
-            </li>
-          </ol>
+          <h3>Submit via agent</h3>
+          <p>No payment submitted by this page.</p>
           <p>
-            If the outcome is uncertain, ask the agent to recover the same payment ID. A new request
-            can pay twice.
+            Require <code>confirmed</code>, payment ID and transaction link. Verify recipient and
+            amount; revoke unused allowance in step 3.
           </p>
+          <p>Recover uncertain payments with the same ID. A new ID can pay twice.</p>
           <a href="https://testnet.stablescan.xyz" target="_blank" rel="noreferrer">
-            Open Stable Testnet explorer <ArrowUpRight size={14} />
+            Explorer <ArrowUpRight size={14} />
           </a>
         </div>
       )}
-      <p className="form-note">
-        Sending a payment requires RPC access in your agent’s environment. The agent checks the
-        exact gas needed before sending.
-      </p>
+      <p className="form-note">RPC access required. CLI estimates gas before signing.</p>
     </section>
   );
 }

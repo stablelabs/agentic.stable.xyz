@@ -391,8 +391,8 @@ test('approval links prefill only agent and amount and explain actual token perm
   await page.goto(`/?agent=${agent}&amount=0.025`);
   await showAll(page);
   await expect(page.getByLabel('Allowance amount (USDT0)')).toHaveValue('0.025');
-  await expect(page.getByText('The agent can send up to')).toContainText('any recipient');
-  await expect(page.getByText('The agent can send up to')).toContainText('no automatic expiry');
+  await expect(page.getByText('Any recipient.')).toContainText('No expiry.');
+  await expect(page.getByText('Any recipient.')).toContainText('after confirmation');
   await expect(page.getByLabel('Expires (UTC)')).toHaveCount(0);
   await expect(page.getByLabel('Allowed recipient')).toHaveCount(0);
 });
@@ -440,7 +440,7 @@ test('invites a signer address without showing an error when no agent is presele
   await expect(page.getByText('Remaining token allowance:')).toContainText(
     'Enter an agent address',
   );
-  await expect(page.getByRole('region', { name: 'Send an agent payment' })).toContainText(
+  await expect(page.getByRole('region', { name: 'CLI', exact: true })).toContainText(
     'agent-wallet payments prepare',
   );
 });
@@ -606,7 +606,7 @@ test('offers manual prompt copying when clipboard access fails and blocks invali
   );
   await connect(page);
   await page.getByRole('button', { name: 'Copy setup prompt' }).click();
-  const setup = page.getByRole('region', { name: 'Set up your agent', exact: true });
+  const setup = page.getByRole('region', { name: 'Configure signer', exact: true });
   await expect(setup).toContainText('Clipboard access is blocked');
   await expect(page.getByLabel('Agent setup prompt')).toBeVisible();
   await page.getByLabel('Agent setup prompt').focus();
@@ -628,15 +628,15 @@ test('copies an exact payment request after approval and gas funding without sen
   const submissions = await fixture(page, { account: other });
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await connect(page);
-  const payment = page.getByRole('region', { name: 'Make your first payment' });
+  const payment = page.getByRole('region', { name: 'Send payment', exact: true });
   const recipient = '0x4444444444444444444444444444444444444444';
   await page.getByLabel('Recipient address', { exact: true }).fill(recipient);
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
   await expect(copy).toBeDisabled();
-  await expect(payment).toContainText('Approve your agent’s token allowance above first');
+  await expect(payment).toContainText('Approve an allowance in step 3.');
   await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Agent approval confirmed');
-  await expect(payment).toContainText('Fund your agent’s gas above first');
+  await expect(payment).toContainText('Fund gas in step 4.');
   await expect(copy).toBeDisabled();
   await page.getByRole('button', { name: 'Fund agent gas' }).click();
   await expect(page.getByRole('status')).toContainText('Agent gas funding confirmed');
@@ -682,7 +682,7 @@ test('validates payment terms and provides manual copying if clipboard access is
   await connect(page);
   await page.getByRole('button', { name: 'Fund agent gas' }).click();
   await expect(page.getByRole('status')).toContainText('Agent gas funding confirmed');
-  const payment = page.getByRole('region', { name: 'Make your first payment' });
+  const payment = page.getByRole('region', { name: 'Send payment', exact: true });
   const recipient = page.getByLabel('Recipient address', { exact: true });
   const amount = page.getByLabel('Payment amount (USDT0)');
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
@@ -697,7 +697,7 @@ test('validates payment terms and provides manual copying if clipboard access is
   }
   await amount.fill('0.010001');
   await expect(copy).toBeDisabled();
-  await expect(payment).toContainText('exceeds your agent’s remaining allowance');
+  await expect(payment).toContainText('exceeds remaining allowance');
   await amount.fill('0.001');
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -771,7 +771,7 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
   await expect(page.getByText('✓ Token network verified', { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('freeze-desktop-start.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('freeze-desktop-start.png') });
   await expect(page.locator('#step-1')).toHaveAttribute('data-state', 'open');
   await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'closed');
   await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
@@ -785,9 +785,9 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await expect(page.locator('#step-5')).toHaveAttribute('data-state', 'open');
   await page.getByLabel('Recipient address', { exact: true }).fill(other);
   await page.getByRole('button', { name: 'Copy payment prompt', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Continue in your agent chat' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Submit via agent' })).toBeVisible();
   await expect(
-    page.getByText('No payment has been sent by this page.', { exact: false }),
+    page.getByText('No payment submitted by this page.', { exact: false }),
   ).toBeVisible();
   expect(submissions).toHaveLength(2);
   await page.screenshot({
