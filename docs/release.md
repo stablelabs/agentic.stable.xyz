@@ -9,6 +9,7 @@ The release is one matching website, CLI package, agent skill and README. Market
 3. Run `npm ci`, `npm run check`, `npm test`, `npm run test:browser` and `npm run build`. Install Chromium once with `npx playwright install chromium` if needed. Inspect desktop, phone and keyboard behavior.
 4. Run `npm run pack:cli`. Install the resulting tarball into a temporary npm prefix. Verify the version and run signer initialization, config import and allowance-link generation with RPC unavailable. The packaging regression test exercises local-only import on the actual archive.
 5. Review the package file list. It must contain only the executable/runtime notices, package metadata, README, docs and skill; no keys, journals or local configuration.
+6. When bundled dependencies change, review and update `packages/cli/runtime-notices.txt`. The build checks every detected dependency's complete notice against this versioned source. Keeping optional-module notices in that source makes the same executable reproducible across install platforms.
 
 ## Publish the exact artifact
 

@@ -40,7 +40,17 @@ for (const [directory, manifest] of [...dependencies].sort(([a], [b]) => a.local
   if (!files.length) throw new Error(`Missing license notice for bundled dependency ${manifest.name}.`);
   notices.push(`${manifest.name}@${manifest.version}\n${(await Promise.all(files.map(file => readFile(join(directory, file), 'utf8')))).join('\n')}`);
 }
-await writeFile(join(target, 'dist/THIRD_PARTY_NOTICES.txt'), notices.join('\n\n--------------------\n\n') + '\n');
+// esbuild can inspect optional modules that are later removed from its output.
+// Their presence depends on the install platform, even when main.js is identical.
+// Preserve the release's complete notice set, and reject a dependency/license
+// change until its notice has been reviewed and added to this source file.
+const releaseNotices = await readFile(join(target, 'runtime-notices.txt'), 'utf8');
+for (const notice of notices) {
+  if (!releaseNotices.includes(notice)) {
+    throw new Error(`Update packages/cli/runtime-notices.txt for ${notice.split('\n')[0]}.`);
+  }
+}
+await writeFile(join(target, 'dist/THIRD_PARTY_NOTICES.txt'), releaseNotices);
 await mkdir(join(target, 'docs'), { recursive: true });
 for (const name of ['cli.md', 'wallet.md']) await cp(join(root, 'docs', name), join(target, 'docs', name));
 await cp(join(root, 'skills/agent-wallet-cli'), join(target, 'skills/agent-wallet-cli'), { recursive: true });
