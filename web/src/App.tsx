@@ -501,7 +501,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
     <div className="shell">
       <header className="site-header">
         <a className="brand" href="/">
-          stable<span> / Agent spending</span>
+          stable
         </a>
         <div className="header-links">
           <Badge variant="outline">Stable Testnet · 2201</Badge>
@@ -516,7 +516,6 @@ Tell me if your storage might not persist between sessions. Stop before making a
       </header>
       <main>
         <div className="intro">
-          <p className="eyebrow">ERC-20 allowances</p>
           <h1>Agent payments</h1>
           <p>
             Approve USDT0. A local signer calls <code>transferFrom</code>.

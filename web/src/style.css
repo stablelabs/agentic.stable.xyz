@@ -136,13 +136,6 @@ p:last-child {
   letter-spacing: -1.5px;
   white-space: nowrap;
 }
-.brand span {
-  font-size: 14px;
-  letter-spacing: 0;
-  color: #666;
-  margin-left: 14px;
-  font-weight: 400;
-}
 .header-links {
   display: flex;
   align-items: center;
@@ -678,11 +671,6 @@ footer strong {
   }
   .brand {
     font-size: 27px;
-  }
-  .brand span {
-    display: block;
-    font-size: 12px;
-    margin: 3px 0 0;
   }
   .header-links {
     gap: 0;
