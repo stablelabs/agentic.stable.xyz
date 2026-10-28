@@ -518,7 +518,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
         <div className="intro">
           <h1>Agent payments</h1>
           <p>
-            Approve USDT0. A local signer calls <code>transferFrom</code>.
+            Give your agent a USDT0 allowance, then send a test payment.
           </p>
         </div>
         <div className="demo-layout">
@@ -1001,7 +1001,6 @@ agent-wallet pay --payment-id PAYMENT_ID --json`}</code>
       </main>
       <footer>
         <p>Test USDT0 only.</p>
-        <p>Owner pays approval and funding gas. Agent pays payment gas.</p>
       </footer>
     </div>
   );
