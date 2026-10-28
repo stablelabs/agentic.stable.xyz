@@ -1,6 +1,8 @@
 name: Verify and deploy agent spending demo
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,24 +11,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: agentic-stable-production
+  group: agentic-stable-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check deployment credential
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo '::error::Add the CLOUDFLARE_API_TOKEN repository secret before deploying.'
-            exit 1
-          fi
-
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
@@ -42,7 +34,22 @@ jobs:
       - run: npm run test:browser
       - run: npm run build:cloudflare
 
+      - name: Verify the published CLI and frozen skill
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: npm run verify:published-cli
+
+      - name: Check deployment credential
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo '::error::Add the CLOUDFLARE_API_TOKEN repository secret before deploying.'
+            exit 1
+          fi
+
       - name: Deploy to Cloudflare
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: '800c4ef344ae29a93b1588a10962b72c'
@@ -50,4 +57,5 @@ jobs:
         run: npx --no-install wrangler deploy
 
       - name: Check the public site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: curl --fail --silent --show-error --retry 3 --retry-delay 5 --output /dev/null https://agentic.stable.xyz/

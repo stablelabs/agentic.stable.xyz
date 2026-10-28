@@ -87,7 +87,7 @@ Linux may need `npx playwright install --with-deps chromium`. Browser tests defa
 
 ## Migration
 
-The root application remains private with `web/`, `agent/`, and `shared/`. `packages/cli` packages the agent as standalone `@stablechain/agent-wallet-cli@0.2.0` with the `agent-wallet` executable. It bundles its runtime and includes docs and the agent skill; there is no separately published SDK. Source development still uses the root `npm run wallet -- …` command with no `build:tools` step.
+The root application remains private with `web/`, `agent/`, and `shared/`. `packages/cli` packages the agent as standalone `@stablechain/agent-wallet-cli@0.2.1` with the `agent-wallet` executable. It bundles its runtime and includes docs and the agent skill; there is no separately published SDK. Source development still uses the root `npm run wallet -- …` command with no `build:tools` step.
 
 Existing schema-2 keys, public configuration, browser records, and payment journals remain compatible and are not moved or rewritten. Your selected private state directory and signer remain the same. The public development file moved from `packages/web/public/wallet-config.json` to `web/public/wallet-config.json`; only paths in commands need updating.
 

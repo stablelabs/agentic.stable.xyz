@@ -19,7 +19,7 @@ The owner approves your signer's address on the USDT0 token and sends it native 
 ## Install and choose the state directory
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.2.0
+npm install --global @stablechain/agent-wallet-cli@0.2.1
 agent-wallet --version --json
 ```
 

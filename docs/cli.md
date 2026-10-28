@@ -3,12 +3,12 @@
 Use Node.js 22+. Install the standalone package:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.2.0
+npm install --global @stablechain/agent-wallet-cli@0.2.1
 agent-wallet --version --json
 agent-wallet --help --json
 ```
 
-This installs the compiled executable and bundled runtime; no checkout, build, SDK, or install scripts are needed. Do not substitute 0.1.x: those releases implement the retired grant flow. For an operator-provided release artifact, install the supplied tarball with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz`.
+This installs the compiled executable and bundled runtime; no checkout, build, SDK, or install scripts are needed. Do not substitute 0.1.x: those releases implement the retired grant flow. For an operator-provided release artifact, install the supplied tarball with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.1.tgz`.
 
 Agents can load the portable skill at `$(npm root --global)/@stablechain/agent-wallet-cli/skills/agent-wallet-cli/SKILL.md` for an operating workflow and recovery decisions. `agent-wallet COMMAND --json` emits one JSON envelope. Preserve stdout even when the process exits nonzero: it contains the structured error and any recovery ID. Source contributors can use `npm --silent run wallet -- COMMAND --json` from the checkout root after `npm ci`.
 
@@ -97,10 +97,10 @@ npm run pack:cli
 
 `pack:cli` invokes the package's `prepack` build. `build:cli` bundles `agent/main.ts` and its runtime into `packages/cli/dist/main.js`, includes dependency license notices, and copies the current docs and skill. The package's file allowlist excludes the web app, source tree, local configuration, and private signer state. The package test installs the actual tarball into an isolated prefix and runs the executable from another directory, including a payment against a controlled local RPC fixture.
 
-Install the resulting tarball with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz` to use or distribute that artifact directly. An authorized maintainer with publish access to `@stablechain` can publish the verified artifact:
+Install the resulting tarball with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.1.tgz` to use or distribute that artifact directly. An authorized maintainer with publish access to `@stablechain` can publish the verified artifact:
 
 ```sh
-npm publish ./stablechain-agent-wallet-cli-0.2.0.tgz --access public
+npm publish ./stablechain-agent-wallet-cli-0.2.1.tgz --access public
 ```
 
 Publishing is an explicit release step; tests and packing do not publish. Keep the manifest, installation examples, and skill version pin aligned for future releases. Existing 0.1.x installs must retain their old state/tool for grant recovery; they must not replay legacy journals with this executable.

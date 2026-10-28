@@ -7,14 +7,14 @@ Standalone agent signer and ERC-20 `transferFrom` payments for USDT0 on Stable T
 Install the published release:
 
 ```sh
-npm install --global @stablechain/agent-wallet-cli@0.2.0
+npm install --global @stablechain/agent-wallet-cli@0.2.1
 agent-wallet --version --json
 agent-wallet --help --json
 ```
 
-Pin 0.2.0 or a later compatible version. Versions 0.1.x use the retired contract-grant flow.
+Pin 0.2.1 or a later compatible version. Versions 0.1.x use the retired contract-grant flow.
 
-For a provided release tarball, install it directly with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.0.tgz`. Maintainers can create this artifact with `npm run pack:cli` from the repository root.
+For a provided release tarball, install it directly with `npm install --global /absolute/path/stablechain-agent-wallet-cli-0.2.1.tgz`. Maintainers can create this artifact with `npm run pack:cli` from the repository root.
 
 ## Configure a signer
 

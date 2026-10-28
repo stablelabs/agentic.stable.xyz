@@ -1,10 +1,10 @@
 {
   "name": "agent-spending-demo",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "wallet": "node --import tsx agent/main.ts",
@@ -14,29 +14,41 @@
     "dev": "vite --config web/vite.config.ts",
     "build": "npm run check && vite build --config web/vite.config.ts && node --import tsx web/scripts/prepare-config.ts",
     "preview": "vite preview --config web/vite.config.ts",
-    "check": "npm run cloudflare:types && tsc --noEmit",
+    "check": "npm run check:release && npm run cloudflare:types && tsc --noEmit",
     "test": "vitest run",
     "test:browser": "playwright test --config web/playwright.config.ts",
     "cloudflare:types": "wrangler types web/deployment/env.d.ts",
     "build:cloudflare": "npm run build",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "check:release": "node scripts/check-release.mjs",
+    "verify:published-cli": "node scripts/verify-published-cli.mjs"
   },
   "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/libre-baskerville": "^5.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.62.0",
+    "radix-ui": "^1.8.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.7.0",
     "viem": "^2.38.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.0",
     "esbuild": "0.28.2",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.19.0",
+    "tw-animate-css": "^1.4.0",
     "typescript": "^5.8.0",
     "vite": "^6.3.0",
-    "vitest": "^3.2.0",
+    "vitest": "^5.0.5",
     "wrangler": "^4.151.0"
   }
 }

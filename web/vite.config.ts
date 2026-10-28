@@ -1,12 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 const path = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
 
 export default defineConfig(({mode}) => ({
   root: path('./'),
   cacheDir: path(`../node_modules/.vite/agent-spending-${mode}`),
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: { alias: { '@': path('./src') } },
   envPrefix: 'PUBLIC_WALLET_',
   server: {
     host: '127.0.0.1', port: 5174, strictPort: true,

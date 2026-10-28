@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { address, formatAmount, parseAmount, validateConfig, type WalletConfig } from '../../shared/owner.js';
+import { Copy, ArrowUpRight } from 'lucide-react';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { Textarea } from './components/ui/textarea';
+import { SKILL_URL } from './release';
+import {
+  address,
+  formatAmount,
+  parseAmount,
+  validateConfig,
+  type WalletConfig,
+} from '../../shared/owner.js';
 
 type Props = {
   config?: WalletConfig;
@@ -8,9 +19,18 @@ type Props = {
   ownerBalance?: bigint;
   gasBalance?: bigint;
   blocked: boolean;
+  blockedReason?: string;
 };
 
-export function PaymentStep({ config, agent, allowance, ownerBalance, gasBalance, blocked }: Props) {
+export function PaymentStep({
+  config,
+  agent,
+  allowance,
+  ownerBalance,
+  gasBalance,
+  blocked,
+  blockedReason,
+}: Props) {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('0.001');
   const [copiedPrompt, setCopiedPrompt] = useState('');
@@ -18,29 +38,52 @@ export function PaymentStep({ config, agent, allowance, ownerBalance, gasBalance
   let selectedAgent: string | undefined;
   let selectedRecipient: string | undefined;
   let paymentAmount: bigint | undefined;
-  try { selectedAgent = address(agent.trim(), 'agent signer'); } catch { /* Wait for a valid signer. */ }
-  try { selectedRecipient = address(recipient.trim(), 'recipient address'); } catch { /* Validate before generating instructions. */ }
-  try { paymentAmount = parseAmount(amount); } catch { /* Keep exact token precision. */ }
+  try {
+    selectedAgent = address(agent.trim(), 'agent signer');
+  } catch {
+    /* Wait for a valid signer. */
+  }
+  try {
+    selectedRecipient = address(recipient.trim(), 'recipient address');
+  } catch {
+    /* Validate before generating instructions. */
+  }
+  try {
+    paymentAmount = parseAmount(amount);
+  } catch {
+    /* Keep exact token precision. */
+  }
 
   let issue = '';
   if (!config) issue = 'Connect MetaMask above to use your wallet and agent.';
-  else if (!selectedAgent || selectedAgent.toLowerCase() === config.alice.toLowerCase()) issue = 'Enter your agent’s separate signer address above.';
-  else if (blocked) issue = 'Resolve any pending wallet operation before preparing a payment prompt.';
-  else if (allowance === undefined || ownerBalance === undefined || gasBalance === undefined) issue = 'Waiting for the wallet balances and allowance. Refresh above if needed.';
+  else if (!selectedAgent || selectedAgent.toLowerCase() === config.alice.toLowerCase())
+    issue = 'Enter your agent’s separate signer address above.';
+  else if (blocked)
+    issue =
+      blockedReason || 'Resolve any pending wallet operation before preparing a payment prompt.';
+  else if (allowance === undefined || ownerBalance === undefined || gasBalance === undefined)
+    issue = 'Waiting for the wallet balances and allowance. Refresh above if needed.';
   else if (allowance === 0n) issue = 'Approve your agent’s token allowance above first.';
   else if (gasBalance === 0n) issue = 'Fund your agent’s gas above first.';
   else if (!selectedRecipient) issue = 'Enter a valid, nonzero recipient address.';
-  else if (paymentAmount === undefined) issue = 'Enter a positive USDT0 amount with at most 6 decimal places.';
-  else if (paymentAmount > allowance) issue = 'The payment exceeds your agent’s remaining allowance.';
-  else if (paymentAmount > ownerBalance) issue = 'Your wallet does not have enough USDT0 for this payment.';
+  else if (paymentAmount === undefined)
+    issue = 'Enter a positive USDT0 amount with at most 6 decimal places.';
+  else if (paymentAmount > allowance)
+    issue = 'The payment exceeds your agent’s remaining allowance.';
+  else if (paymentAmount > ownerBalance)
+    issue = 'Your wallet does not have enough USDT0 for this payment.';
 
   let prompt = '';
   if (!issue && config && selectedAgent && selectedRecipient && paymentAmount !== undefined) {
-    const settings = validateConfig({ ...config, defaultAgent: address(selectedAgent), approvalUrl: new URL(location.pathname, location.origin).href });
+    const settings = validateConfig({
+      ...config,
+      defaultAgent: address(selectedAgent),
+      approvalUrl: new URL(location.pathname, location.origin).href,
+    });
     prompt = `Send exactly ${formatAmount(paymentAmount)} USDT0 to ${selectedRecipient} on Stable Testnet (chain 2201) from my wallet ${settings.alice}. This authorizes this one payment only.
 
 Follow the "Pay" and "Recover" sections of the agent-wallet-cli skill:
-https://raw.githubusercontent.com/stablelabs/agentic.stable.xyz/refs/heads/main/skills/agent-wallet-cli/SKILL.md
+${SKILL_URL}
 
 Use the signer you created during setup; whoami must return ${selectedAgent}. If you can't find it, ask me where it is. Don't create a new signer.
 
@@ -51,23 +94,133 @@ ${JSON.stringify(settings, null, 2)}`;
   const copyFailed = !!prompt && failedPrompt === prompt;
   async function copy() {
     if (!prompt) return;
-    try { await navigator.clipboard.writeText(prompt); setCopiedPrompt(prompt); setFailedPrompt(''); }
-    catch { setFailedPrompt(prompt); setCopiedPrompt(''); }
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedPrompt(prompt);
+      setFailedPrompt('');
+    } catch {
+      setFailedPrompt(prompt);
+      setCopiedPrompt('');
+    }
   }
 
-  return <section className="create-panel" aria-label="Make your first payment">
-    <p className="eyebrow">PAY WITH YOUR AGENT</p><h2>Make your first payment</h2>
-    <p className="form-note">Choose a recipient and amount, then paste the payment prompt into the same agent chat you used for setup. Your agent will check, sign, and send the payment from your allowance.</p>
-    <form onSubmit={event => { event.preventDefault(); void copy(); }}>
-      <div className="form-grid">
-        <label>Recipient address<input aria-label="Recipient address" required value={recipient} onChange={event => setRecipient(event.target.value)} placeholder="0x…" autoComplete="off" spellCheck={false} aria-invalid={!!recipient && !selectedRecipient} /></label>
-        <label>Payment amount (USDT0)<input required inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} aria-invalid={!!amount && paymentAmount === undefined} /></label>
-      </div>
-      {config && <p className="form-note">Remaining allowance: <strong>{allowance === undefined ? 'Unavailable' : `${formatAmount(allowance)} USDT0`}</strong></p>}
-      <button className="primary" type="submit" disabled={!prompt}>{copied ? 'Payment prompt copied' : 'Copy payment prompt'}</button>
-      <p className="form-note" aria-live="polite">{issue || (copyFailed ? 'Clipboard access is blocked. Select and copy the payment prompt below.' : copied ? 'Paste into the same agent chat to request this payment. The agent will report its result there.' : 'Copying does not move funds. Pasting this prompt asks your agent to send the specified payment.')}</p>
-    </form>
-    {prompt && <details className="setup-prompt" open={copyFailed ? true : undefined}><summary>View or manually copy payment prompt</summary><textarea aria-label="Agent payment prompt" readOnly value={prompt} rows={12} onFocus={event => event.currentTarget.select()} /></details>}
-    <p className="form-note">Sending a payment requires RPC access in your agent’s environment. The agent checks the exact gas needed before sending.</p>
-  </section>;
+  return (
+    <section className="payment-step" aria-label="Make your first payment">
+      <p className="form-note">
+        Choose a recipient and amount, then paste the payment prompt into the same agent chat you
+        used for setup. Your agent will check, sign, and send the payment from your allowance.
+      </p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void copy();
+        }}
+      >
+        <div className="form-grid">
+          <label>
+            Recipient address
+            <Input
+              aria-label="Recipient address"
+              required
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+              placeholder="0x…"
+              autoComplete="off"
+              spellCheck={false}
+              aria-invalid={!!recipient && !selectedRecipient}
+              aria-describedby="recipient-help"
+            />
+          </label>
+          <label>
+            Payment amount (USDT0)
+            <Input
+              required
+              inputMode="decimal"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              aria-invalid={!!amount && paymentAmount === undefined}
+              aria-describedby="payment-help"
+            />
+          </label>
+        </div>
+        <p id="recipient-help" className="field-error">
+          {recipient && !selectedRecipient ? 'Enter a valid, nonzero recipient address.' : ''}
+        </p>
+        <p id="payment-help" className="field-error">
+          {amount && paymentAmount === undefined
+            ? 'Enter a positive amount with at most 6 decimal places.'
+            : ''}
+        </p>
+        {config && (
+          <p className="form-note">
+            Remaining allowance:{' '}
+            <strong>
+              {allowance === undefined ? 'Unavailable' : `${formatAmount(allowance)} USDT0`}
+            </strong>
+          </p>
+        )}
+        <Button type="submit" disabled={!prompt}>
+          <Copy size={16} aria-hidden="true" />
+          {copied ? 'Payment prompt copied' : 'Copy payment prompt'}
+        </Button>
+        <p className="form-note" aria-live="polite">
+          {issue ||
+            (copyFailed
+              ? 'Clipboard access is blocked. Select and copy the payment prompt below.'
+              : copied
+                ? 'Paste into the same agent chat to request this payment. The agent will report its result there.'
+                : 'Copying does not move funds. Pasting this prompt asks your agent to send the specified payment.')}
+        </p>
+      </form>
+      {prompt && (
+        <details className="setup-prompt" open={copyFailed ? true : undefined}>
+          <summary>View or manually copy payment prompt</summary>
+          <Textarea
+            aria-label="Agent payment prompt"
+            readOnly
+            value={prompt}
+            rows={12}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        </details>
+      )}
+      {prompt && (
+        <div className="payment-review">
+          <span>ONE PAYMENT · STABLE TESTNET</span>
+          <p>
+            <strong>{formatAmount(paymentAmount!)} USDT0</strong> to{' '}
+            <code>{selectedRecipient}</code>
+          </p>
+        </div>
+      )}
+      {copied && (
+        <div className="handoff-state">
+          <h3>Continue in your agent chat</h3>
+          <p>The prompt is copied. No payment has been sent by this page.</p>
+          <ol>
+            <li>Paste it into the same chat used for setup.</li>
+            <li>
+              Wait for your agent to report <code>confirmed</code>, with the payment ID and
+              transaction link.
+            </li>
+            <li>
+              Open that link to verify the recipient and amount. Check the remaining allowance here,
+              then revoke it in step 3 when you’re finished.
+            </li>
+          </ol>
+          <p>
+            If the outcome is uncertain, ask the agent to recover the same payment ID. A new request
+            can pay twice.
+          </p>
+          <a href="https://testnet.stablescan.xyz" target="_blank" rel="noreferrer">
+            Open Stable Testnet explorer <ArrowUpRight size={14} />
+          </a>
+        </div>
+      )}
+      <p className="form-note">
+        Sending a payment requires RPC access in your agent’s environment. The agent checks the
+        exact gas needed before sending.
+      </p>
+    </section>
+  );
 }

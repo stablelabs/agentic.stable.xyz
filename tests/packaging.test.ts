@@ -96,6 +96,7 @@ it('installs the packed executable offline and pays from existing signer state o
     const config = join(directory, 'public-config.json');
     await writeFile(config, JSON.stringify({ schemaVersion: 2, chainId: 2201, token: TOKEN, alice: owner, rpcUrl: `http://127.0.0.1:${address.port}`, approvalUrl: 'https://agentic.stable.xyz' }));
     expect((await run('config', 'import', '--file', config)).data.alice).toBe(owner);
+    expect(rpcMethods).toEqual([]); // The published artifact must support offline signer setup too.
     expect((await run('doctor')).data.ready).toBe(true);
     const link = new URL((await run('allowance', 'link', '--amount', '0.01')).data.approvalUrl);
     expect(link.searchParams.get('agent')).toBe(signer);
