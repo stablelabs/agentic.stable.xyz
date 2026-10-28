@@ -1,6 +1,6 @@
 {
   "name": "@stablechain/agent-wallet-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Standalone agent signer and recoverable ERC-20 transferFrom payments on Stable Testnet.",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "prepack": "node ../../scripts/build-cli.mjs"
+    "prepack": "node ../../scripts/check-release.mjs && node ../../scripts/build-cli.mjs"
   },
   "repository": {
     "type": "git",
@@ -30,6 +30,13 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "keywords": ["stablechain", "agent-wallet", "erc20", "payments", "testnet", "cli"],
+  "keywords": [
+    "stablechain",
+    "agent-wallet",
+    "erc20",
+    "payments",
+    "testnet",
+    "cli"
+  ],
   "license": "UNLICENSED"
 }
