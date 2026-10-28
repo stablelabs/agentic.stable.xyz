@@ -1,35 +1,49 @@
-# Give your agent a USDT0 allowance
+# Let an agent pay from your wallet
 
-Use the [Stable Testnet demo](https://agentic.stable.xyz/) to approve an allowance, configure a local agent signer, and send a test payment from your wallet.
+Approve `0.01` USDT0. Pay `0.006`. Dry-run another `0.006`.
 
-The owner approves spending in MetaMask. The agent submits an ERC-20 `transferFrom` transaction. Tokens stay in the owner’s wallet until payment; the agent holds its own signing key and native USDT0 for gas.
+That last request should fail.
 
-## Run the demo
+Try it on [Stable Testnet](https://agentic.stable.xyz/), chain `2201`. You’ll need MetaMask, [test USDT0](https://faucet.stable.xyz/), and an agent with terminal access, Node.js 22+ and persistent storage.
 
-You need MetaMask, [test USDT0](https://faucet.stable.xyz/), and an agent with terminal access, Node.js 22+ and persistent signer storage. Use Stable Testnet, chain `2201`.
+## Who signs what
 
-1. **Connect wallet.** Connect MetaMask to the demo.
-2. **Configure signer.** Copy the setup prompt into your agent chat. It installs `@stablechain/agent-wallet-cli@0.2.1`, creates or reuses a signer, and returns an approval link. Open that link in the same browser.
-3. **Approve allowance.** Review the signer address and approve `0.01` USDT0 in MetaMask.
-4. **Fund gas.** Send native USDT0 to the signer through the demo. This balance is separate from the token allowance.
-5. **Send payment.** Enter a recipient and `0.006` USDT0. Paste the payment prompt into the same agent chat. The agent signs and submits; the page only generates the prompt.
+Your wallet key stays in MetaMask. The agent gets a separate signer in its own environment. You approve that signer on the USDT0 contract:
 
-Check the confirmed receipt, recipient and amount. With no other spending or allowance changes, `0.004` USDT0 remains available to the signer.
+```solidity
+// You sign. USDT0 has 6 decimals.
+USDT0.approve(agent, 10_000); // 0.01 USDT0
 
-## What the allowance permits
+// The agent signs.
+USDT0.transferFrom(owner, recipient, 6_000); // 0.006 USDT0
+```
 
-The token contract enforces the remaining allowance. It permits any recipient and has no expiry. Approval reserves no funds; payment also requires a sufficient owner balance.
+Approval leaves the tokens in your wallet. `transferFrom` moves them to the recipient and reduces the allowance. In this example, `0.004` remains.
 
-The CLI checks allowance, balance and gas before signing. After the example payment, a `0.006` USDT0 dry-run exceeds the remaining `0.004` and fails before signing.
+The contract never reads your prompt. “Send this amount to this recipient, once” is an instruction to the agent. The allowance permits aggregate spending up to the approved amount, to any recipient, with no expiry.
 
-Return to **Approve allowance** to revoke the remainder. Revocation takes effect when confirmed. It does not reverse payments or return the signer’s gas balance. Changing a positive allowance requires revoking it first.
+## Same symbol, two balances
 
-## Keep the payment record
+The owner supplies token USDT0 for payments. The signer needs native USDT0 for gas. Approving tokens does not fund either balance.
 
-The CLI prepares an intent with a local payment ID, saves signed transaction bytes before broadcast, and verifies the receipt before reporting `confirmed`.
+In the demo, connect MetaMask and paste the setup prompt into your agent chat. Open the returned approval link in the same browser. Check the signer, approve `0.01`, then fund its gas separately.
 
-If the result is uncertain, use the original payment ID and signer directory with `payments wait` or `payments resume`. A new ID can pay twice. The ID coordinates local recovery; it is not an onchain duplicate check.
+Set a recipient and `0.006` in step 5. Paste the payment prompt into the same chat. The CLI signs and submits from the agent’s environment; copying the prompt on the page sends nothing.
 
-[Open the demo](https://agentic.stable.xyz/) · [Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
+## Test the boundary
 
-Testnet only; unaudited. Signer keys are stored locally in plaintext files with restricted permissions.
+Check the confirmed receipt, including the token’s `Transfer` event: your wallet, the recipient and `0.006` USDT0. Refresh the allowance: `0.004`, assuming no other spending or changes.
+
+Ask the agent to dry-run another `0.006`. The CLI returns `INSUFFICIENT_ALLOWANCE` before signing. This exercises its preflight check; the token contract also enforces the allowance onchain.
+
+Revoke the remainder in step 3. Wait for confirmation. Revocation stops further allowance spending; completed payments and gas funding stay where they went.
+
+## When the reply goes missing
+
+An RPC timeout can hide a successful payment. Sending another payment to find out is an expensive debugging technique.
+
+The CLI saves signed bytes before broadcast. Keep the payment ID and signer directory: `payments wait` checks the receipt; `payments resume` can reuse the saved transaction and nonce. A new ID starts a separate intent and can pay twice. These IDs live in local state, so recovery depends on keeping that state.
+
+[Demo](https://agentic.stable.xyz/) · [Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI and recovery reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
+
+Testnet only; unaudited. Signer keys are plaintext files with restricted permissions. Keep them private.

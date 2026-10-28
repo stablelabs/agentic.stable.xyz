@@ -1,15 +1,13 @@
 # Agent payments demo
 
-Give your agent a USDT0 allowance and send a test payment on Stable Testnet.
+Approve `0.01` USDT0. Let your agent pay `0.006`. Dry-run another `0.006` and watch the CLI refuse: only `0.004` remains.
 
-Connect MetaMask → configure a local signer → approve allowance → fund gas → send payment.
+Your wallet key stays in MetaMask. The agent uses its own signer to call `transferFrom` from your wallet. Fund its native USDT0 gas balance separately.
 
-The demo generates prompts for your agent chat. The agent uses `@stablechain/agent-wallet-cli@0.2.1` to submit ERC-20 `transferFrom` payments from your wallet.
-
-You need MetaMask, test USDT0, and an agent with terminal access, Node.js 22+ and persistent signer storage.
-
-Allowances permit any recipient and have no expiry. Revoke unused allowance after testing. Testnet only; unaudited.
+The contract never reads your prompt: this allowance permits any recipient and has no expiry. Revoke the remainder when you’re done; wait for confirmation.
 
 **Demo:** https://agentic.stable.xyz/
 **Source and setup:** https://github.com/stablelabs/agentic.stable.xyz
 **Faucet:** https://faucet.stable.xyz/
+
+Testnet only; unaudited.
