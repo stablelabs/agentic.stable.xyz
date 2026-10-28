@@ -1,49 +1,49 @@
-# Let an agent pay from your wallet
+# Let your agent buy the missing data
 
-Approve `0.01` USDT0. Pay `0.006`. Dry-run another `0.006`.
+You ask an agent to compare three companies. It finds the filings, but needs a service that turns one awkward document into structured financial data. The service charges per result.
 
-That last request should fail.
+Suppose the provider quotes `0.006` USDT0 for the extraction. Your agent should be able to buy that result and finish the comparison, within a spending limit you chose. This provider and price are illustrative.
 
-Try it on [Stable Testnet](https://agentic.stable.xyz/), chain `2201`. You’ll need MetaMask, [test USDT0](https://faucet.stable.xyz/), and an agent with terminal access, Node.js 22+ and persistent storage.
+## Give the signer an allowance
 
-## Who signs what
-
-Your wallet key stays in MetaMask. The agent gets a separate signer in its own environment. You approve that signer on the USDT0 contract:
+Your wallet key stays in MetaMask. The agent has its own signer. You approve `0.01` USDT0 of spending authority on the token contract; your application separately authorizes the quoted `0.006` payment to this provider.
 
 ```solidity
-// You sign. USDT0 has 6 decimals.
-USDT0.approve(agent, 10_000); // 0.01 USDT0
+// You sign. ERC-20 USDT0 uses 6 decimals.
+USDT0.approve(agent, 10_000);
 
-// The agent signs.
-USDT0.transferFrom(owner, recipient, 6_000); // 0.006 USDT0
+// The agent signs the authorized payment.
+USDT0.transferFrom(owner, provider, 6_000);
 ```
 
-Approval leaves the tokens in your wallet. `transferFrom` moves them to the recipient and reduces the allowance. In this example, `0.004` remains.
+The tokens stay in your wallet until payment. The provider receives `0.006`; the signer has `0.004` allowance remaining, assuming no other spending or changes.
 
-The contract never reads your prompt. “Send this amount to this recipient, once” is an instruction to the agent. The allowance permits aggregate spending up to the approved amount, to any recipient, with no expiry.
+The contract never reads your prompt. Your application must validate the provider, price and order before authorizing payment. The allowance itself permits any recipient and has no expiry. Onchain recipient or expiry restrictions need a different authorization design.
 
-## Same symbol, two balances
+## One asset covers payment and gas
 
-The owner supplies token USDT0 for payments. The signer needs native USDT0 for gas. Approving tokens does not fund either balance.
+On Stable, USDT0 is both the payment asset and the native gas asset. Its native interface uses 18 decimals; its ERC-20 interface uses 6. Both expose the [same underlying balance per account](https://docs.stable.xyz/en/explanation/usdt0-behavior/).
 
-In the demo, connect MetaMask and paste the setup prompt into your agent chat. Open the returned approval link in the same browser. Check the signer, approve `0.01`, then fund its gas separately.
+In this design, payment comes from your account and gas comes from the agent’s. Fund the signer accordingly. Its gas spending sits outside the allowance you approved.
 
-Set a recipient and `0.006` in step 5. Paste the payment prompt into the same chat. The CLI signs and submits from the agent’s environment; copying the prompt on the page sends nothing.
+## Match the money to the work
 
-## Test the boundary
+The provider needs an order record: extraction, price, payer, recipient, token and chain. It must match the confirmed token `Transfer` event to those terms and ensure one payment cannot unlock several orders.
 
-Check the confirmed receipt, including the token’s `Transfer` event: your wallet, the recipient and `0.006` USDT0. Refresh the allowance: `0.004`, assuming no other spending or changes.
+`transferFrom` carries no order ID. Your application supplies that association. The CLI’s local payment ID tracks transaction recovery.
 
-Ask the agent to dry-run another `0.006`. The CLI returns `INSUFFICIENT_ALLOWANCE` before signing. This exercises its preflight check; the token contract also enforces the allowance onchain.
+The payment lands. The API reply disappears.
 
-Revoke the remainder in step 3. Wait for confirmation. Revocation stops further allowance spending; completed payments and gas funding stay where they went.
+The CLI saves signed bytes before broadcast. Keep its payment ID and signer state to check or recover that transaction. Then retry delivery against the same provider order. Paying again is an expensive way to retry an HTTP request.
 
-## When the reply goes missing
+Payment confirmation proves the money moved. Your order system still has to track whether the result arrived. Settlement alone provides no delivery guarantee.
 
-An RPC timeout can hide a successful payment. Sending another payment to find out is an expensive debugging technique.
+## Try the payment mechanism
 
-The CLI saves signed bytes before broadcast. Keep the payment ID and signer directory: `payments wait` checks the receipt; `payments resume` can reuse the saved transaction and nonce. A new ID starts a separate intent and can pay twice. These IDs live in local state, so recovery depends on keeping that state.
+The [demo](https://agentic.stable.xyz/) isolates this part: approve `0.01`, send `0.006`, dry-run another `0.006`, then revoke the remainder. The CLI rejects that second request before signing because only `0.004` allowance remains.
 
-[Demo](https://agentic.stable.xyz/) · [Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI and recovery reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
+It runs on Stable Testnet and includes no paid API or order system. For an HTTP payment protocol, Stable also documents [pay-per-call APIs with x402](https://docs.stable.xyz/en/how-to/build-pay-per-call/), using ERC-3009 authorizations through a separate integration.
 
-Testnet only; unaudited. Signer keys are plaintext files with restricted permissions. Keep them private.
+[Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI and recovery reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
+
+The demo is testnet only and unaudited. Its signer keys are plaintext files with restricted permissions; keep the state private and persistent.
