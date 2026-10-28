@@ -69,10 +69,10 @@ function Step({
 }
 const stages = [
   'Connect wallet',
-  'Set up agent',
+  'Configure signer',
   'Approve allowance',
-  'Fund transaction fees',
-  'Make a payment',
+  'Fund gas',
+  'Send payment',
 ];
 
 const failure = (error: unknown) =>
@@ -124,7 +124,7 @@ export default function App() {
     try {
       selectedAgent = address(agent.trim(), 'agent address');
       if (connected && selectedAgent.toLowerCase() === account!.toLowerCase())
-        throw new Error('Use your agent’s separate address, not your MetaMask wallet address.');
+        throw new Error('Agent and owner addresses must differ.');
     } catch (e) {
       selectedAgent = undefined;
       agentError = failure(e);
@@ -199,8 +199,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
   useEffect(() => {
     fetch('/wallet-config.json', { cache: 'no-store' })
       .then(async (response) => {
-        if (!response.ok)
-          throw new Error('Demo settings are unavailable. Refresh the page or try again shortly.');
+        if (!response.ok) throw new Error('Settings unavailable. Reload to retry.');
         const c = validateConfig(await response.json());
         setConfig(c);
         setAgent(new URLSearchParams(location.search).get('agent') || c.defaultAgent || '');
@@ -237,9 +236,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
         setOperation(saved);
         if (unresolved(saved)) setAgent(saved.intent.agent);
         if (unresolved(saved))
-          setNotice(
-            'A previous wallet operation is unverified. Check its confirmation before another approval or gas transfer.',
-          );
+          setNotice('Unverified wallet transaction. Resolve it before submitting another.');
       }
       setStorageReady(true);
     } catch {
@@ -301,7 +298,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
     if (!provider) return;
     const invalidate = () => {
       disconnect();
-      setNotice('Wallet account or network changed. Reconnect MetaMask to continue.');
+      setNotice('Wallet account or network changed. Reconnect MetaMask.');
     };
     provider.on?.('accountsChanged', invalidate);
     provider.on?.('chainChanged', invalidate);
@@ -391,7 +388,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setConfig(selectedConfig);
       setAccount(selected);
       setVerified(true);
-      setNotice('Owner connected. Review the agent address and allowance before approving.');
+      setNotice('');
     } catch (e) {
       disconnect();
       setError(failure(e));
@@ -427,9 +424,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
     } catch {
       if (revision === connectionId.current) {
         setPromptCopied(false);
-        setPromptCopyError(
-          'Clipboard access is blocked. Open the setup prompt below, select the text, and copy it into your agent app.',
-        );
+        setPromptCopyError('Clipboard access is blocked. Copy the prompt below.');
       }
     }
   }
@@ -467,22 +462,19 @@ Tell me if your storage might not persist between sessions. Stop before making a
     setError('');
     try {
       const owner = await ownerClient();
-      setNotice('Review and confirm this transaction in MetaMask. The wallet owner pays its gas.');
+      setNotice('Confirm in MetaMask. Owner pays gas.');
       const op =
         action === 'fund'
           ? await owner.fundAgentGas({ agent: selectedAgent, amount: gasAmount })
           : action === 'revoke'
             ? await owner.revoke(selectedAgent)
             : await owner.approve({ agent: selectedAgent, amount });
-      if (revision === connectionId.current)
-        setNotice('Submitted. Waiting for onchain confirmation…');
+      if (revision === connectionId.current) setNotice('Submitted. Awaiting confirmation…');
       await confirm(op);
     } catch (e) {
       if (revision === connectionId.current) {
         setError(failure(e));
-        setNotice(
-          'Check the saved operation and MetaMask history before retrying an uncertain submission.',
-        );
+        setNotice('Check the saved transaction and MetaMask history before retrying.');
       }
     } finally {
       setBusy(false);
@@ -524,25 +516,15 @@ Tell me if your storage might not persist between sessions. Stop before making a
       </header>
       <main>
         <div className="intro">
-          <p className="eyebrow">A SMALL LIMIT. A REAL ONCHAIN PAYMENT.</p>
-          <h1>
-            Give your agent
-            <br />
-            <span>a spending limit.</span>
-          </h1>
+          <p className="eyebrow">ERC-20 allowances</p>
+          <h1>Agent payments</h1>
           <p>
-            Keep your tokens in your wallet. Approve a little test USDT0,
-            <br className="desktop-break" /> then ask your agent to make a payment.
+            Approve USDT0. A local signer calls <code>transferFrom</code>.
           </p>
-          <div className="intro-meta">
-            <span>Testnet funds only</span>
-            <span>Keys stay with you</span>
-            <span>Revoke at any time</span>
-          </div>
         </div>
         <div className="demo-layout">
           <aside className="journey-sidebar">
-            <p className="eyebrow">YOUR WALKTHROUGH</p>
+            <p className="eyebrow">Steps</p>
             <ol className="journey-nav" aria-label="Demo progress">
               {stages.map((name, index) => (
                 <li key={name}>
@@ -562,20 +544,16 @@ Tell me if your storage might not persist between sessions. Stop before making a
               ))}
             </ol>
             <div className="sidebar-note">
-              <ShieldCheck size={20} aria-hidden="true" />
-              <p>
-                Your wallet’s private key stays in MetaMask. Your agent holds its own separate key.
-              </p>
               <a href={skillPageUrl} target="_blank" rel="noreferrer">
-                Read the agent skill <ArrowUpRight size={14} />
+                Agent skill <ArrowUpRight size={14} />
               </a>
             </div>
           </aside>
           <div className="main-column">
             <Card className="wallet-strip" role="region" aria-label="Wallet owner">
               <div>
-                <p className="eyebrow">YOUR WALLET</p>
-                <p className="address">{account || 'Connect your wallet to begin'}</p>
+                <p className="eyebrow">Owner</p>
+                <p className="address">{account || 'Not connected'}</p>
                 <p className="account-meta">
                   {connected
                     ? verified
@@ -624,7 +602,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
             )}
             {operation?.hash && (
               <p className="transaction">
-                Latest wallet transaction:{' '}
+                Transaction:{' '}
                 <a href={`${EXPLORER}/tx/${operation.hash}`} target="_blank" rel="noreferrer">
                   {operation.hash} ↗
                 </a>
@@ -632,10 +610,10 @@ Tell me if your storage might not persist between sessions. Stop before making a
             )}
             {pending && (
               <section className="message recovery" aria-label="Pending operation">
-                <h2>Check your previous transaction</h2>
+                <h2>Unverified transaction</h2>
                 <p>
-                  This {operation!.action === 'fund' ? 'gas transfer' : 'token approval'} is
-                  unverified. Another submission is blocked until its outcome is confirmed.
+                  {operation!.action === 'fund' ? 'Gas transfer' : 'Token approval'} unverified. New
+                  submissions blocked until confirmed.
                 </p>
                 <p>
                   Agent: {operation!.intent.agent}
@@ -666,9 +644,8 @@ Tell me if your storage might not persist between sessions. Stop before making a
                       Verify transaction
                     </Button>
                     <p>
-                      If MetaMask shows that nothing was submitted, retain this record and resolve
-                      it before continuing. Do not send another transaction to recover an unknown
-                      outcome.
+                      Keep this record. Check MetaMask history; do not submit a replacement
+                      transaction while the outcome is unknown.
                     </p>
                   </form>
                 )}
@@ -695,59 +672,48 @@ Tell me if your storage might not persist between sessions. Stop before making a
             >
               <Step
                 number={1}
-                title="Connect your wallet"
-                summary={
-                  connected
-                    ? 'Your MetaMask wallet is connected.'
-                    : 'Your wallet stays in your control.'
-                }
+                title="Connect wallet"
+                summary={connected ? 'Connected' : 'MetaMask · chain 2201'}
                 complete={connected}
               >
-                <p>You’ll need three things to try the demo:</p>
                 <ul className="requirements">
                   <li>
                     <strong>MetaMask</strong>
                     <span>
-                      Use the browser extension or MetaMask’s mobile browser.{' '}
+                      Extension or mobile browser.{' '}
                       <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
-                        Get MetaMask ↗
+                        Install ↗
                       </a>
                     </span>
                   </li>
                   <li>
                     <strong>Test USDT0</strong>
                     <span>
-                      Get free test funds for your wallet.{' '}
                       <a href="https://faucet.stable.xyz" target="_blank" rel="noreferrer">
-                        Open faucet ↗
+                        Faucet ↗
                       </a>
                     </span>
                   </li>
                   <li>
-                    <strong>An agent with terminal access</strong>
-                    <span>The agent needs Node.js 22+ and persistent storage for its signer.</span>
+                    <strong>Agent</strong>
+                    <span>Terminal, Node.js 22+, persistent signer storage.</span>
                   </li>
                 </ul>
                 <p className="form-note">
-                  Connect MetaMask above. We’ll switch to Stable Testnet. Connecting shares your
-                  public address; approval and funding each ask for a separate confirmation.
+                  Connection shares your address only. MetaMask confirms approvals and funding
+                  separately.
                 </p>
               </Step>
               <Step
                 number={2}
-                title="Set up your agent"
-                summary={
-                  selectedAgent
-                    ? 'Agent address added. Keep its original signer.'
-                    : 'Copy one prompt. Your agent returns an approval link.'
-                }
+                title="Configure signer"
+                summary={selectedAgent ? 'Address set' : 'Local CLI · Node.js 22+'}
                 complete={!!selectedAgent}
               >
-                <section aria-label="Set up your agent">
+                <section aria-label="Configure signer">
                   <p>
-                    Choose a spending limit, then paste the setup prompt into your agent chat. Your
-                    agent creates or reuses its own signer and returns an approval link. Open that
-                    link in this browser.
+                    Paste the setup prompt into your agent chat. Open the returned approval link
+                    here.
                   </p>
                   <label htmlFor="allowance-amount">Allowance amount (USDT0)</label>
                   <Input
@@ -760,8 +726,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     aria-describedby="allowance-help"
                   />
                   <p id="allowance-help" className={amountError ? 'field-error' : 'form-note'}>
-                    {amountError ||
-                      '0.01 USDT0 is a small limit to explore the demo. This sets a cap; it does not send a payment.'}
+                    {amountError}
                   </p>
                   <div className="actions">
                     <Button disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>
@@ -774,17 +739,17 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   </div>
                   <p className="form-note" aria-live="polite">
                     {!connected
-                      ? 'Connect MetaMask above to include your wallet’s public address.'
+                      ? 'Connect MetaMask.'
                       : !setupPrompt
-                        ? 'Enter a valid allowance amount to generate the setup prompt.'
+                        ? 'Enter a valid allowance amount.'
                         : promptCopyError ||
                           (promptCopied
-                            ? 'Paste into your agent chat, then open the approval link it returns.'
-                            : 'Setup is local. Your agent will stop before sending a payment.')}
+                            ? 'Paste in your agent chat; open its approval link.'
+                            : 'Setup does not send payments.')}
                   </p>
                   {setupPrompt && (
                     <details className="setup-prompt" open={promptCopyError ? true : undefined}>
-                      <summary>View or manually copy setup prompt</summary>
+                      <summary>Setup prompt</summary>
                       <Textarea
                         aria-label="Agent setup prompt"
                         readOnly
@@ -795,7 +760,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     </details>
                   )}
                   <div className="field-divider">
-                    <span>Already have an agent?</span>
+                    <span>Existing signer</span>
                   </div>
                   <label htmlFor="agent-signer">Agent signer</label>
                   <Input
@@ -808,15 +773,14 @@ Tell me if your storage might not persist between sessions. Stop before making a
                       setGasBalance(undefined);
                     }}
                     disabled={busy || pending}
-                    placeholder="Paste the agent’s 0x address"
+                    placeholder="0x…"
                     autoComplete="off"
                     spellCheck={false}
                     aria-invalid={!!agentError}
                     aria-describedby="agent-help"
                   />
                   <p id="agent-help" className={agentError ? 'field-error' : 'form-note'}>
-                    {agentError ||
-                      'Use the separate signer address returned by your agent. Never enter a private key.'}
+                    {agentError || 'Signer address only. Keep the private key local.'}
                   </p>
                   <Button
                     variant="outline"
@@ -831,19 +795,16 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   >
                     Download wallet settings
                   </Button>
-                  <p className="form-note">
-                    Public settings only, for this wallet and signer. Your MetaMask private key
-                    stays with you.
-                  </p>
+                  <p className="form-note">Public owner, token, RPC and signer settings.</p>
                 </section>
               </Step>
               <Step
                 number={3}
-                title="Approve an allowance"
+                title="Approve allowance"
                 summary={
                   allowance && allowance > 0n
-                    ? `${formatAmount(allowance)} USDT0 remaining · allowance active`
-                    : 'Review the limit and confirm in MetaMask.'
+                    ? `${formatAmount(allowance)} USDT0 remaining`
+                    : 'ERC-20 approve'
                 }
                 complete={allowance !== undefined && allowance > 0n}
               >
@@ -875,11 +836,10 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   <div className="permission-note">
                     <ShieldCheck size={18} aria-hidden="true" />
                     <div>
-                      <strong>What this permission allows</strong>
+                      <strong>Allowance scope</strong>
                       <p>
-                        The agent can send up to its remaining allowance to any recipient. There is
-                        no automatic expiry. Revoke the allowance to stop future spending; confirmed
-                        payments cannot be undone.
+                        Any recipient. No expiry. Revocation applies after confirmation; completed
+                        transfers are final.
                       </p>
                     </div>
                   </div>
@@ -895,8 +855,8 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   </p>
                   {allowance !== undefined && allowance > 0n && (
                     <p className="form-note">
-                      Your allowance is active. To change the amount, first revoke it to zero and
-                      wait for confirmation, then approve the new amount.
+                      To change a nonzero allowance: revoke, wait for confirmation, then approve
+                      again.
                     </p>
                   )}
                   <div className="actions">
@@ -931,20 +891,20 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   </div>
                   <p className="form-note">
                     {!connected
-                      ? 'Connect your wallet to approve an agent.'
+                      ? 'Connect MetaMask.'
                       : !selectedAgent
-                        ? 'Add a valid, separate agent address in step 2.'
-                        : 'Tokens stay in your wallet until the agent spends them. The owner pays the approval fee.'}
+                        ? 'Set the signer in step 2.'
+                        : 'Approval leaves tokens in the owner wallet. Owner pays gas.'}
                   </p>
                 </form>
               </Step>
               <Step
                 number={4}
-                title="Fund transaction fees"
+                title="Fund gas"
                 summary={
                   gasBalance !== undefined && gasBalance > 0n
-                    ? 'Gas balance available. The agent checks exact fees before paying.'
-                    : 'A separate balance pays your agent’s network fees.'
+                    ? `${formatUnits(gasBalance, 18)} native USDT0`
+                    : 'Native USDT0'
                 }
                 complete={gasBalance !== undefined && gasBalance > 0n}
               >
@@ -966,9 +926,8 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     </strong>
                   </p>
                   <p className="form-note">
-                    This separate transfer belongs to the selected agent and does not use its token
-                    allowance. Revoking the allowance does not return gas funding. This top-up is
-                    not a fee estimate; your agent checks the exact gas before paying.
+                    Native USDT0 for the agent’s fees, outside its token allowance. Revocation does
+                    not return this balance.
                   </p>
                   <label htmlFor="gas-amount">Gas top-up (native USDT0)</label>
                   <Input
@@ -981,8 +940,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     aria-describedby="gas-help"
                   />
                   <p id="gas-help" className={gasError ? 'field-error' : 'form-note'}>
-                    {gasError ||
-                      'Fund a small balance for network fees. This is separate from the spending limit.'}
+                    {gasError || 'Manual top-up, not a fee estimate.'}
                   </p>
                   <Button
                     type="submit"
@@ -994,11 +952,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   </Button>
                 </form>
               </Step>
-              <Step
-                number={5}
-                title="Make a payment"
-                summary="Choose the terms. Your agent signs and sends the payment."
-              >
+              <Step number={5} title="Send payment" summary="Agent-signed transferFrom">
                 <PaymentStep
                   config={connected ? config : undefined}
                   agent={agent}
@@ -1008,23 +962,17 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   blocked={busy || pending || !storageReady || !verified || !!networkError}
                   blockedReason={
                     !verified || networkError
-                      ? 'Network checks are unavailable. Retry the network check before preparing a payment.'
+                      ? 'Network check failed. Retry before preparing a payment.'
                       : undefined
                   }
                 />
               </Step>
             </Accordion>
-            <section className="manual-section" aria-label="Send an agent payment">
+            <section className="manual-section" aria-label="CLI">
               <details>
-                <summary>
-                  Prefer the command line? <span>Use the agent CLI</span>
-                </summary>
+                <summary>CLI</summary>
                 <div className="manual-body">
-                  <p>
-                    With Node.js 22+, install the same CLI used by the setup prompt. Reuse the
-                    original absolute state directory if you already have a signer. Set that
-                    directory before running <code>init</code>; it keeps an existing signer.
-                  </p>
+                  <p>Node.js 22+. Reuse the signer’s original absolute state directory.</p>
                   <pre>
                     <code>{`npm install --global @stablechain/agent-wallet-cli@${CLI_VERSION}
 export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
@@ -1036,14 +984,14 @@ agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.001 --jso
 agent-wallet pay --payment-id PAYMENT_ID --json`}</code>
                   </pre>
                   <p className="form-note">
-                    Download public wallet settings in step 2. Replace the recipient and payment ID.
-                    Preserve the same ID and signer directory if a result is uncertain.{' '}
+                    Download settings in step 2. Replace recipient and payment ID. Recover uncertain
+                    payments with the same ID and signer directory.{' '}
                     <a
                       href={`https://www.npmjs.com/package/@stablechain/agent-wallet-cli/v/${CLI_VERSION}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      CLI setup and recovery guide ↗
+                      CLI reference ↗
                     </a>
                   </p>
                 </div>
@@ -1053,16 +1001,8 @@ agent-wallet pay --payment-id PAYMENT_ID --json`}</code>
         </div>
       </main>
       <footer>
-        <p>
-          Built for exploring.
-          <br />
-          <strong>Stable Testnet · test USDT0 only.</strong>
-        </p>
-        <p>
-          The owner pays approval and funding fees. The agent pays payment fees.
-          <br />
-          Token allowances have no recipient restriction or automatic expiry.
-        </p>
+        <p>Test USDT0 only.</p>
+        <p>Owner pays approval and funding gas. Agent pays payment gas.</p>
       </footer>
     </div>
   );
