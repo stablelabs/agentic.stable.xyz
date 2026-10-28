@@ -263,6 +263,9 @@ async function fixture(
   return submissions;
 }
 async function showAll(page: Page) {
+  await expect(
+    page.getByRole('button', { name: /^(Show all steps|Focus current step)$/ }),
+  ).toBeVisible();
   const button = page.getByRole('button', { name: 'Show all steps', exact: true });
   if (await button.isVisible()) await button.click();
 }
@@ -762,6 +765,46 @@ test('an RPC outage retains wallet identity while blocking spending until checks
   expect(submissions).toHaveLength(0);
 });
 
+test('highlights the selected step independently of wallet progress', async ({ page }) => {
+  const submissions = await fixture(page, { noDefaultAgent: true });
+  await page.goto('/');
+  const progress = page.getByRole('list', { name: 'Demo progress' });
+  const current = progress.locator('[aria-current="step"]');
+  for (const [number, title] of [
+    [2, 'Configure signer'],
+    [4, 'Fund gas'],
+    [5, 'Send payment'],
+    [3, 'Approve allowance'],
+    [1, 'Connect wallet'],
+  ] as const) {
+    const link = progress.getByRole('link', { name: `${number}. ${title}`, exact: true });
+    await link.click();
+    await expect(current).toHaveCount(1);
+    await expect(link).toHaveAttribute('aria-current', 'step');
+    await expect(page.locator('#step-' + number)).toHaveAttribute('data-state', 'open');
+    await expect(page.locator('.walkthrough-heading')).toContainText(`Step ${number} of 5`);
+  }
+  // Opening a card directly also selects it; expanding all cards preserves that selection.
+  await page
+    .getByRole('button', { name: 'Configure signer Local CLI · Node.js 22+', exact: true })
+    .click();
+  await expect(current).toHaveAccessibleName('2. Configure signer');
+  await page.getByRole('button', { name: 'Show all steps', exact: true }).click();
+  await expect(page.locator('.step-card[data-state="open"]')).toHaveCount(5);
+  await expect(current).toHaveAccessibleName('2. Configure signer');
+  await page.getByRole('button', { name: 'Focus current step', exact: true }).click();
+  await expect(page.locator('.step-card[data-state="open"]')).toHaveCount(1);
+  await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  // Keyboard selection does not mark incomplete wallet steps complete.
+  const gasStep = progress.getByRole('link', { name: '4. Fund gas', exact: true });
+  await gasStep.focus();
+  await gasStep.press('Enter');
+  await expect(gasStep).toHaveAttribute('aria-current', 'step');
+  await expect(progress.locator('.nav-number svg')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText('Not connected');
+  expect(submissions).toHaveLength(0);
+});
+
 test('guides a new visitor through five steps and ends with an honest payment handoff', async ({
   page,
   context,
@@ -776,6 +819,10 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'closed');
   await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
   await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  await expect(page.getByRole('link', { name: '2. Configure signer', exact: true })).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
   await page.getByLabel('Allowance amount (USDT0)').fill('0.01');
   await page.getByLabel('Agent signer', { exact: true }).fill(agent);
   await expect(page.locator('#step-3')).toHaveAttribute('data-state', 'open');
@@ -783,6 +830,10 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
   await page.getByRole('button', { name: 'Fund agent gas', exact: true }).click();
   await expect(page.locator('#step-5')).toHaveAttribute('data-state', 'open');
+  await expect(page.getByRole('link', { name: '5. Send payment', exact: true })).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
   await page.getByLabel('Recipient address', { exact: true }).fill(other);
   await page.getByRole('button', { name: 'Copy payment prompt', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Submit via agent' })).toBeVisible();

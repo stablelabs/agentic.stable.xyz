@@ -115,6 +115,7 @@ export default function App() {
   const [promptCopyError, setPromptCopyError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [openSteps, setOpenSteps] = useState<string[]>(['1']);
+  const [selectedStep, setSelectedStep] = useState(1);
   const pending = unresolved(operation);
   // Wallet identity is independent of network reads and signer-field validation.
   const connected = !!account && account.toLowerCase() === config?.alice.toLowerCase();
@@ -154,6 +155,7 @@ export default function App() {
   const allSteps = openSteps.length === 5;
   useEffect(() => {
     const moveFocus = !!document.activeElement?.closest('.step-card');
+    setSelectedStep(currentStep);
     setOpenSteps((previous) => (previous.length === 5 ? previous : [String(currentStep)]));
     if (!allSteps && moveFocus) {
       const frame = requestAnimationFrame(() =>
@@ -167,6 +169,7 @@ export default function App() {
   const walletBlocked =
     !connected || !verified || !!networkError || !storageReady || busy || pending;
   function showStep(number: number) {
+    setSelectedStep(number);
     setOpenSteps([String(number)]);
   }
 
@@ -530,14 +533,14 @@ Tell me if your storage might not persist between sessions. Stop before making a
                   <a
                     href={`#step-${index + 1}`}
                     aria-label={`${index + 1}. ${name}`}
-                    aria-current={currentStep === index + 1 ? 'step' : undefined}
+                    aria-current={selectedStep === index + 1 ? 'step' : undefined}
                     onClick={() => showStep(index + 1)}
                   >
                     <span className="nav-number" aria-hidden="true">
                       {index + 1 < currentStep ? <Check size={14} /> : index + 1}
                     </span>
                     <span>{name}</span>
-                    {index + 1 === currentStep && <ChevronRight size={14} aria-hidden="true" />}
+                    {index + 1 === selectedStep && <ChevronRight size={14} aria-hidden="true" />}
                   </a>
                 </li>
               ))}
@@ -652,12 +655,12 @@ Tell me if your storage might not persist between sessions. Stop before making a
             )}
             <div className="walkthrough-heading">
               <p>
-                Step {currentStep} of 5 <span>· {stages[currentStep - 1]}</span>
+                Step {selectedStep} of 5 <span>· {stages[selectedStep - 1]}</span>
               </p>
               <Button
                 variant="ghost"
                 onClick={() =>
-                  setOpenSteps(allSteps ? [String(currentStep)] : ['1', '2', '3', '4', '5'])
+                  setOpenSteps(allSteps ? [String(selectedStep)] : ['1', '2', '3', '4', '5'])
                 }
               >
                 {allSteps ? 'Focus current step' : 'Show all steps'}
@@ -666,7 +669,11 @@ Tell me if your storage might not persist between sessions. Stop before making a
             <Accordion
               type="multiple"
               value={openSteps}
-              onValueChange={setOpenSteps}
+              onValueChange={(steps) => {
+                const opened = steps.find((step) => !openSteps.includes(step));
+                if (opened) setSelectedStep(Number(opened));
+                setOpenSteps(steps);
+              }}
               className="walkthrough"
             >
               <Step
