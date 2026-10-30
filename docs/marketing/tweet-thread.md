@@ -1,43 +1,18 @@
-# Tweet thread
+# X
 
-## 1/6
+## Tweet 1
 
-Approve 0.01 USDT0. Let your agent pay 0.006. Dry-run another 0.006.
+Alice covered dinner. Your assistant can repay her using its own signer and a USDT0 allowance from your wallet.
 
-That last request should fail.
+Stable Build #6 follows the approval, payment and revocation. Your wallet key stays in MetaMask.
 
-Try it on Stable Testnet:
-https://agentic.stable.xyz/
+Demo (Stable Testnet): https://agentic.stable.xyz/
 
-## 2/6
+## Tweet 2 — reply to Tweet 1
 
-Your wallet key stays in MetaMask. The agent has its own signer.
+The allowance permits any recipient and has no expiry. The CLI verifies the payment and preserves the transaction for recovery.
 
-You call approve. It calls transferFrom. Tokens move from your wallet to the recipient; the allowance falls from 0.01 to 0.004.
-
-## 3/6
-
-The contract never reads your prompt.
-
-“Pay this recipient once” is an instruction to the agent. Its allowance permits any recipient and has no expiry. Keep it small; revoke the remainder when you’re done.
-
-## 4/6
-
-Same symbol, two balances: your token USDT0 funds the payment; the signer’s native USDT0 funds gas.
-
-After paying 0.006, dry-run another 0.006. The CLI sees only 0.004 allowance left and rejects it before signing.
-
-## 5/6
-
-An RPC timeout can hide a successful payment.
-
-The CLI saves signed bytes before broadcast. Recover with the same payment ID and signer directory to reuse that transaction. A new ID can pay twice.
-
-## 6/6
-
-Check the confirmed receipt: token transfer, recipient, amount. Then revoke the unused allowance and wait for confirmation. Gas funding stays with the signer.
-
-Source, CLI and setup:
-https://github.com/stablelabs/agentic.stable.xyz
+Read the build: [ARTICLE_URL]
+Source: https://github.com/stablelabs/agentic.stable.xyz
 
 Testnet only; unaudited.

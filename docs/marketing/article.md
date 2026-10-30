@@ -1,4 +1,4 @@
-# Let your assistant settle up
+# Stable Build #6: Let your assistant settle up
 
 An assistant can spend from your wallet using its own signer. You grant that authority through an ERC-20 allowance, which caps how many tokens it can transfer. Your wallet key stays in MetaMask.
 

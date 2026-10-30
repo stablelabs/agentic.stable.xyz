@@ -7,13 +7,13 @@ Demo source: `f8c381aa5b6345ac2bce43c455e80fd4dbc89b85`. CLI and skill: `cli-v0.
 | Asset | File | Status |
 | --- | --- | --- |
 | Article | [article.md](article.md) | Draft |
-| Tweet thread | [tweet-thread.md](tweet-thread.md) | Draft; six posts |
+| Tweet thread | [tweet-thread.md](tweet-thread.md) | Draft; two posts |
 | Discord announcement | [discord-announcement.md](discord-announcement.md) | Draft |
 | Video walkthrough | [video-walkthrough.md](video-walkthrough.md) | Script; recording and edit pending |
 
 ## Editorial direction
 
-Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the story uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. Other assets retain the earlier experiment framing until the article settles.
+Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the story uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. X and Discord copy follow this article. The video script retains the earlier experiment framing pending alignment.
 
 Keep these distinctions intact when editing:
 
@@ -32,4 +32,4 @@ Prefer consequences over feature lists. Use humor where the failure earns it. Do
 - [USDT0 balance model](https://docs.stable.xyz/en/explanation/usdt0-behavior/)
 - [Release and acceptance evidence](https://github.com/stablelabs/agentic.stable.xyz/releases/tag/cli-v0.2.1)
 
-Publish the article and video before adding their final URLs to social copy. Use the numbered headings in the thread as post boundaries, not post text. Scheduling and distribution are pending review.
+Replace `[ARTICLE_URL]` with the published article URL before scheduling. Use the tweet headings as post boundaries, not post text. Scheduling and distribution are pending review.

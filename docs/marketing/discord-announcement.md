@@ -1,13 +1,11 @@
-# Agent payments demo
+# Stable Build #6: Let your assistant settle up
 
-Approve `0.01` USDT0. Let your agent pay `0.006`. Dry-run another `0.006` and watch the CLI refuse: only `0.004` remains.
+Alice covered dinner. This build follows her repayment through a USDT0 allowance, an agent-signed transfer and a verified receipt.
 
-Your wallet key stays in MetaMask. The agent uses its own signer to call `transferFrom` from your wallet. Fund its native USDT0 gas balance separately.
+MetaMask holds your wallet key; `@stablechain/agent-wallet-cli` uses a separate signer. The allowance permits spending to any recipient and has no expiry. The walkthrough covers gas funding, timeout recovery and revocation.
 
-The contract never reads your prompt: this allowance permits any recipient and has no expiry. Revoke the remainder when you’re done; wait for confirmation.
-
-**Demo:** https://agentic.stable.xyz/
-**Source and setup:** https://github.com/stablelabs/agentic.stable.xyz
-**Faucet:** https://faucet.stable.xyz/
+**Read:** [ARTICLE_URL]
+**Demo (Stable Testnet):** https://agentic.stable.xyz/
+**Source:** https://github.com/stablelabs/agentic.stable.xyz
 
 Testnet only; unaudited.
