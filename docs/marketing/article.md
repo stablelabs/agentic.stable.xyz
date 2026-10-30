@@ -1,50 +1,60 @@
 # Let your assistant settle up
 
-Maya covered dinner. You owe her 6 USDT0.
+Alice covered dinner. You owe her 6 USDT0.
 
-“Send Maya 6 USDT0. Here’s her wallet address.”
+“Send Alice 6 USDT0. Here’s her wallet address.”
 
-## Give it a limit
+Your assistant runs a CLI with its own signing key. Your key stays in MetaMask. An ERC-20 allowance gives that signer permission to spend from your account.
 
-Your wallet key stays in MetaMask. The agent has its own signer. You approve a 10 USDT0 allowance for that signer on the token contract. The money stays in your wallet until spent; approval reserves none of it.
+## What are you authorizing?
+
+You approve 10 USDT0 for the agent’s signer:
 
 ```solidity
-// You sign. ERC-20 USDT0 uses 6 decimals.
+// Signed by you. ERC-20 USDT0 uses 6 decimals.
 USDT0.approve(agent, 10_000_000);
-
-// The agent signs the payment you requested.
-USDT0.transferFrom(owner, maya, 6_000_000);
 ```
 
-Maya receives 6 USDT0. The allowance falls to 4, assuming no other spending or changes. You don’t sign a second transaction for this payment.
+The token contract records `allowance(owner, agent)`. That grant permits aggregate spending up to 10 USDT0, to any recipient. It has no expiry and reserves no funds.
 
-The contract never sees “Maya” or “dinner.” It sees addresses and amounts. This allowance permits spending to any recipient, with no expiry. Your instruction authorizes one payment; the contract grants broader authority. Enforcing a recipient restriction or expiry requires additional controls.
+The allowance does not encode Alice, dinner or “once.” Your instruction authorizes one payment; the signer holds broader authority. Recipient restrictions and expiry require a different authorization design.
 
-## Someone still pays gas
+## Who signs the payment and pays gas?
 
-On Stable, USDT0 covers both payments and gas. Its native and ERC-20 interfaces expose the [same underlying balance per account](https://docs.stable.xyz/en/explanation/usdt0-behavior/).
+With approval confirmed, the agent signs a transaction calling the USDT0 contract:
 
-Here, the payment comes from your account. Gas comes from the agent’s separate account, which you fund beforehand. That gas spending sits outside your token allowance.
+```solidity
+// Signed by the agent.
+USDT0.transferFrom(owner, aliceAddress, 6_000_000);
+```
 
-## Don’t pay for dinner twice
+The contract checks your balance and the agent’s allowance. A successful transfer moves 6 USDT0 from your account to Alice’s and reduces the allowance to 4, assuming no other spending or changes.
 
-The agent submits the transaction. The RPC times out. Maya might already have the money.
+The agent pays gas from its own account. On Stable, USDT0 is also the native gas asset: its native interface uses 18 decimals; its ERC-20 interface uses 6. Both expose the [same underlying balance per account](https://docs.stable.xyz/en/explanation/usdt0-behavior/).
 
-The demo’s CLI saves the signed transaction before broadcasting. Keep the original payment ID and signer state to check or recover that payment. Starting over with a new ID creates a separate payment intent.
+Fund the signer for gas before sending. Those fees sit outside your token allowance.
 
-The CLI verifies the transaction terms and matching token transfer before reporting confirmation. A transaction hash alone doesn’t prove payment.
+## How do you verify Alice got paid?
 
-An allowance won’t prevent every duplicate: if both payments fit, it permits both.
+A transaction hash gives you something to look up. Confirmation requires a successful receipt with evidence of the requested transfer.
 
-## Take permission back
+The CLI verifies the transaction’s signer, token contract and calldata, and matches a USDT0 `Transfer` event from your address to Alice’s for the exact amount. It reports `confirmed` only after those checks pass.
 
-Set the allowance to zero. Once that transaction confirms, further payments using this allowance fail. Revocation doesn’t undo earlier transfers or reclaim the agent’s gas balance.
+## What if the RPC times out?
 
-## Try it on testnet
+The transaction can land while your client is waiting for a response. Alice may already have the money.
 
-The [demo](https://agentic.stable.xyz/) runs this flow with smaller amounts. Use a second testnet wallet for Maya: approve `0.01` USDT0, send `0.006`, then dry-run another `0.006`. The CLI rejects it before signing because only `0.004` allowance remains. Revoke the remainder and check that another payment fails.
+The CLI persists the signed transaction and nonce before broadcasting. Keep the original payment ID and signer directory to check or recover that transaction. Recovery can reuse the saved signed bytes.
 
-First-time setup takes more work than a direct transfer. Use this example to inspect the permission you’re granting before trusting an agent with it.
+Starting over with a new ID creates a separate payment intent. The ID is local bookkeeping, not an onchain duplicate check. If two payments fit within the allowance, the contract permits both.
+
+## How do you revoke access?
+
+Once Alice’s payment is confirmed, sign `approve(agent, 0)` from your wallet and wait for confirmation. Further payments using that allowance then fail. Revocation doesn’t undo confirmed transfers or reclaim the signer’s gas balance.
+
+## Can you run this now?
+
+The [demo](https://agentic.stable.xyz/) runs this flow on Stable Testnet with smaller amounts. Use a second testnet wallet for Alice: approve `0.01` USDT0, send `0.006`, then dry-run another `0.006`. The CLI rejects it before signing because only `0.004` allowance remains. Revoke the remainder and check that another payment fails.
 
 [Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI and recovery reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
 
