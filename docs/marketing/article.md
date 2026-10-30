@@ -1,10 +1,12 @@
 # Let your assistant settle up
 
-Alice covered dinner. You owe her 6 USDT0.
+An assistant can spend from your wallet using its own signer. You grant that authority through an ERC-20 allowance, which caps how many tokens it can transfer. Your wallet key stays in MetaMask.
+
+This build uses a [demo on Stable Testnet](https://agentic.stable.xyz/) and `@stablechain/agent-wallet-cli` to follow a payment from approval to confirmation and revocation. The page prepares prompts; the CLI runs in your assistant’s environment, signs `transferFrom` transactions and preserves them for recovery. Payments and gas both use USDT0.
+
+Suppose Alice covered dinner. You owe her 6 USDT0:
 
 “Send Alice 6 USDT0. Here’s her wallet address.”
-
-Your assistant runs a CLI with its own signing key. Your key stays in MetaMask. An ERC-20 allowance gives that signer permission to spend from your account.
 
 ## What are you authorizing?
 
@@ -52,7 +54,7 @@ Starting over with a new ID creates a separate payment intent. The ID is local b
 
 Once Alice’s payment is confirmed, sign `approve(agent, 0)` from your wallet and wait for confirmation. Further payments using that allowance then fail. Revocation doesn’t undo confirmed transfers or reclaim the signer’s gas balance.
 
-## Can you run this now?
+## How do you run the demo?
 
 The [demo](https://agentic.stable.xyz/) runs this flow on Stable Testnet with smaller amounts. Use a second testnet wallet for Alice: approve `0.01` USDT0, send `0.006`, then dry-run another `0.006`. The CLI rejects it before signing because only `0.004` allowance remains. Revoke the remainder and check that another payment fails.
 

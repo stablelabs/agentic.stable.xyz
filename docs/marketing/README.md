@@ -13,7 +13,7 @@ Demo source: `f8c381aa5b6345ac2bce43c455e80fd4dbc89b85`. CLI and skill: `cli-v0.
 
 ## Editorial direction
 
-The article follows a repayment to Alice through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the story uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. Other assets retain the earlier experiment framing until the article settles.
+Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the story uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. Other assets retain the earlier experiment framing until the article settles.
 
 Keep these distinctions intact when editing:
 
