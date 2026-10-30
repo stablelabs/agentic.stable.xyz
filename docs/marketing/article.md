@@ -1,49 +1,51 @@
-# Let your agent buy the missing data
+# Let your assistant settle up
 
-You ask an agent to compare three companies. It finds the filings, but needs a service that turns one awkward document into structured financial data. The service charges per result.
+Maya covered dinner. You owe her 6 USDT0.
 
-Suppose the provider quotes `0.006` USDT0 for the extraction. Your agent should be able to buy that result and finish the comparison, within a spending limit you chose. This provider and price are illustrative.
+“Send Maya 6 USDT0. Here’s her wallet address.”
 
-## Give the signer an allowance
+## Give it a limit
 
-Your wallet key stays in MetaMask. The agent has its own signer. You approve `0.01` USDT0 of spending authority on the token contract; your application separately authorizes the quoted `0.006` payment to this provider.
+Your wallet key stays in MetaMask. The agent has its own signer. You approve a 10 USDT0 allowance for that signer on the token contract. The money stays in your wallet until spent; approval reserves none of it.
 
 ```solidity
 // You sign. ERC-20 USDT0 uses 6 decimals.
-USDT0.approve(agent, 10_000);
+USDT0.approve(agent, 10_000_000);
 
-// The agent signs the authorized payment.
-USDT0.transferFrom(owner, provider, 6_000);
+// The agent signs the payment you requested.
+USDT0.transferFrom(owner, maya, 6_000_000);
 ```
 
-The tokens stay in your wallet until payment. The provider receives `0.006`; the signer has `0.004` allowance remaining, assuming no other spending or changes.
+Maya receives 6 USDT0. The allowance falls to 4, assuming no other spending or changes. You don’t sign a second transaction for this payment.
 
-The contract never reads your prompt. Your application must validate the provider, price and order before authorizing payment. The allowance itself permits any recipient and has no expiry. Onchain recipient or expiry restrictions need a different authorization design.
+The contract never sees “Maya” or “dinner.” It sees addresses and amounts. This allowance permits spending to any recipient, with no expiry. Your instruction authorizes one payment; the contract grants broader authority. Enforcing a recipient restriction or expiry requires additional controls.
 
-## One asset covers payment and gas
+## Someone still pays gas
 
-On Stable, USDT0 is both the payment asset and the native gas asset. Its native interface uses 18 decimals; its ERC-20 interface uses 6. Both expose the [same underlying balance per account](https://docs.stable.xyz/en/explanation/usdt0-behavior/).
+On Stable, USDT0 covers both payments and gas. Its native and ERC-20 interfaces expose the [same underlying balance per account](https://docs.stable.xyz/en/explanation/usdt0-behavior/).
 
-In this design, payment comes from your account and gas comes from the agent’s. Fund the signer accordingly. Its gas spending sits outside the allowance you approved.
+Here, the payment comes from your account. Gas comes from the agent’s separate account, which you fund beforehand. That gas spending sits outside your token allowance.
 
-## Match the money to the work
+## Don’t pay for dinner twice
 
-The provider needs an order record: extraction, price, payer, recipient, token and chain. It must match the confirmed token `Transfer` event to those terms and ensure one payment cannot unlock several orders.
+The agent submits the transaction. The RPC times out. Maya might already have the money.
 
-`transferFrom` carries no order ID. Your application supplies that association. The CLI’s local payment ID tracks transaction recovery.
+The demo’s CLI saves the signed transaction before broadcasting. Keep the original payment ID and signer state to check or recover that payment. Starting over with a new ID creates a separate payment intent.
 
-The payment lands. The API reply disappears.
+The CLI verifies the transaction terms and matching token transfer before reporting confirmation. A transaction hash alone doesn’t prove payment.
 
-The CLI saves signed bytes before broadcast. Keep its payment ID and signer state to check or recover that transaction. Then retry delivery against the same provider order. Paying again is an expensive way to retry an HTTP request.
+An allowance won’t prevent every duplicate: if both payments fit, it permits both.
 
-Payment confirmation proves the money moved. Your order system still has to track whether the result arrived. Settlement alone provides no delivery guarantee.
+## Take permission back
 
-## Try the payment mechanism
+Set the allowance to zero. Once that transaction confirms, further payments using this allowance fail. Revocation doesn’t undo earlier transfers or reclaim the agent’s gas balance.
 
-The [demo](https://agentic.stable.xyz/) isolates this part: approve `0.01`, send `0.006`, dry-run another `0.006`, then revoke the remainder. The CLI rejects that second request before signing because only `0.004` allowance remains.
+## Try it on testnet
 
-It runs on Stable Testnet and includes no paid API or order system. For an HTTP payment protocol, Stable also documents [pay-per-call APIs with x402](https://docs.stable.xyz/en/how-to/build-pay-per-call/), using ERC-3009 authorizations through a separate integration.
+The [demo](https://agentic.stable.xyz/) runs this flow with smaller amounts. Use a second testnet wallet for Maya: approve `0.01` USDT0, send `0.006`, then dry-run another `0.006`. The CLI rejects it before signing because only `0.004` allowance remains. Revoke the remainder and check that another payment fails.
+
+First-time setup takes more work than a direct transfer. Use this example to inspect the permission you’re granting before trusting an agent with it.
 
 [Source and setup](https://github.com/stablelabs/agentic.stable.xyz) · [CLI and recovery reference](https://github.com/stablelabs/agentic.stable.xyz/blob/main/docs/cli.md)
 
-The demo is testnet only and unaudited. Its signer keys are plaintext files with restricted permissions; keep the state private and persistent.
+Testnet only; unaudited. Signer keys are plaintext files with restricted permissions. Keep the state private and persistent.
