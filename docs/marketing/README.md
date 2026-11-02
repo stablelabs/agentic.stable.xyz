@@ -9,11 +9,11 @@ Demo source: `f8c381aa5b6345ac2bce43c455e80fd4dbc89b85`. CLI and skill: `cli-v0.
 | Article | [article.md](article.md) | Draft |
 | Tweet thread | [tweet-thread.md](tweet-thread.md) | Draft; two posts |
 | Discord announcement | [discord-announcement.md](discord-announcement.md) | Draft |
-| Video walkthrough | [video-walkthrough.md](video-walkthrough.md) | Script; recording and edit pending |
+| Video walkthrough | [video-walkthrough.md](video-walkthrough.md) | Four-minute script; recording and edit pending |
 
 ## Editorial direction
 
-Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the story uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. X and Discord copy follow this article. The video script retains the earlier experiment framing pending alignment.
+Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the article uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. X, Discord and video follow the same repayment. The video adds a read-only receipt check, an over-limit dry-run and a smaller dry-run after revocation.
 
 Keep these distinctions intact when editing:
 
