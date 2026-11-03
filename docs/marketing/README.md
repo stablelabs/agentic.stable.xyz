@@ -11,6 +11,7 @@ Demo source: `f8c381aa5b6345ac2bce43c455e80fd4dbc89b85`. CLI and skill: `cli-v0.
 | Discord announcement | [discord-announcement.md](discord-announcement.md) | Draft |
 | Video walkthrough | [video-walkthrough.md](video-walkthrough.md) | Four-minute script; recording and edit pending |
 | Mechanism sketch | [Editable Excalidraw](agent-payment-mechanisms.excalidraw) · [Preview](agent-payment-mechanisms.png) · [Presenter notes](agent-payment-mechanisms.md) | Current allowance flow and historical account grants |
+| Chain comparison | [Research and visual previews](../research/agentic-chain-comparison/README.md) · [Excalidraw](../research/agentic-chain-comparison/comparison.excalidraw) | Stable, Tempo and Arc; source-checked 2026-11-03 |
 
 ## Editorial direction
 

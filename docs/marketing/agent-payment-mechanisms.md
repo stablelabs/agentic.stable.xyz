@@ -2,6 +2,8 @@
 
 [Editable Excalidraw](agent-payment-mechanisms.excalidraw) · [PNG preview](agent-payment-mechanisms.png)
 
+For the three-chain comparison, see [Stable, Tempo and Arc: research and diagrams](../research/agentic-chain-comparison/README.md).
+
 Open the `.excalidraw` file in Excalidraw. Each mechanism has its own frame. Select a frame title and press **Shift+2** to fit it; **Shift+1** fits the whole sketch. Use the first frame alongside the live demo; pan down for the historical comparison. Blue arrows are calls; green arrows are token movement. Dashed green arrows show optional gas funding by the owner.
 
 ## Presentation beats
