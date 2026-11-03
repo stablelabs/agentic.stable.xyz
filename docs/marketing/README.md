@@ -13,7 +13,7 @@ Demo source: `f8c381aa5b6345ac2bce43c455e80fd4dbc89b85`. CLI and skill: `cli-v0.
 
 ## Editorial direction
 
-Introduce the allowance model, demo and CLI before the repayment to Alice. Follow that payment through authorization, signing and gas, confirmation, timeout recovery and revocation. Question headings follow that transaction lifecycle. Use the demo as an executable example: the article uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. X, Discord and video follow the same repayment. The video adds a read-only receipt check, an over-limit dry-run and a smaller dry-run after revocation.
+Use the reviewed title: **Agentic Payments on Stable: Delegated Spending, Verification, and Recovery**. The article and socials use a repayment example. The video teaches the general owner/agent/recipient model: spending authority, execution, verification, recovery and revocation. Use the demo as executable evidence: the article uses 10/6 USDT0; the testnet walkthrough uses 0.01/0.006. The video includes a read-only receipt check, an over-limit dry-run and a smaller dry-run after revocation.
 
 Keep these distinctions intact when editing:
 

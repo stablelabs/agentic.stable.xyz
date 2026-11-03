@@ -1,4 +1,4 @@
-# Stable Build #6: Let your assistant settle up
+# Stable Build #6: Agentic Payments on Stable: Delegated Spending, Verification, and Recovery
 
 Alice covered dinner. This build follows her repayment through a USDT0 allowance, an agent-signed transfer and a verified receipt.
 
