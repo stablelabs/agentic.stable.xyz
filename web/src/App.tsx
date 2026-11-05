@@ -1295,7 +1295,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
           </Accordion>
         </main>
         <footer className="site-footer">
-          <p>Test USDT0 only. Testnet demo; unaudited.</p>
+          <p>Test USDT0 only. Testnet demo.</p>
           <p>
             <a href={MAIN_SITE_URL}>stable.xyz</a>
           </p>
