@@ -158,7 +158,9 @@ export default function App() {
   const [gasBalance, setGasBalance] = useState<bigint>();
   const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [restoring, setRestoring] = useState(false);
+  // True from first render until the silent wallet restore has run, so Connect is never briefly
+  // clickable while that check is about to start.
+  const [restoring, setRestoring] = useState(() => !wasDisconnected());
   const [error, setError] = useState('');
   const [networkError, setNetworkError] = useState('');
   const [notice, setNotice] = useState('');
@@ -486,7 +488,8 @@ Tell me if your storage might not persist between sessions. Stop before making a
   useEffect(() => {
     if (!config || restoreAttempted.current) return;
     restoreAttempted.current = true;
-    if (!wasDisconnected()) void connect({ silent: true });
+    if (wasDisconnected()) setRestoring(false);
+    else void connect({ silent: true });
   }, [config]);
   // One add-network request at a time, shared by the header action and connect().
   function addNetworkOnce(provider: () => Provider | Promise<Provider>, rpcUrl?: string) {
@@ -778,15 +781,18 @@ Tell me if your storage might not persist between sessions. Stop before making a
             )}
             <p className={verified ? 'account-meta verified' : 'account-meta'}>{walletStatus}</p>
             <div className="actions wallet-actions">
-              <Button disabled={busy || !config || connected} onClick={() => void connect()}>
+              <Button
+                disabled={busy || restoring || !config || connected}
+                onClick={() => void connect()}
+              >
                 <Wallet size={16} aria-hidden="true" />
                 {connected
                   ? 'Owner connected'
-                  : busy
-                    ? restoring
-                      ? 'Checking MetaMask…'
-                      : 'Connecting…'
-                    : 'Connect MetaMask'}
+                  : restoring && config
+                    ? 'Checking MetaMask…'
+                    : busy
+                      ? 'Connecting…'
+                      : 'Connect MetaMask'}
               </Button>
               {account && (
                 <Button
