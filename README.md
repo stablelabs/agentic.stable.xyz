@@ -10,7 +10,7 @@ USDT0 allowances and ERC-20 `transferFrom` payments. The owner approves spending
 
 Requires MetaMask, [test USDT0](https://faucet.stable.xyz), and an agent with terminal access, Node.js 22+ and persistent signer storage. Network: Stable Testnet, chain `2201`.
 
-1. Connect MetaMask.
+1. Add Stable Testnet to MetaMask from the header (optional; connecting also adds it), then connect MetaMask.
 2. Paste the setup prompt into your agent chat. Open its approval link in the same browser.
 3. Approve an allowance, e.g. `0.01` USDT0.
 4. Fund the signer with native USDT0 for gas.
@@ -59,7 +59,7 @@ npm run dev
 
 Open [localhost:5174](http://localhost:5174). For another port, set `--approval-url` during configuration. Run source CLI commands with `npm --silent run wallet --`.
 
-React/Vite, shadcn/ui and Radix. Self-hosted Libre Baskerville headings and Atkinson Hyperlegible body text. Cloudflare serves static assets and public settings; signers run locally.
+React/Vite, shadcn/ui and Radix, styled with the Stable design system tokens. Self-hosted Work Sans body text, IBM Plex Mono labels and DM Sans headings (the system's fallback for Aeonik). Cloudflare serves static assets and public settings; signers run locally.
 
 ## Verification
 

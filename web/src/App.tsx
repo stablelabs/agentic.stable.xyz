@@ -14,9 +14,18 @@ import {
   type OwnerOperation,
   type WalletConfig,
 } from '../../shared/owner.js';
-import { metaMask, type Provider } from './metamask';
+import { addStableTestnet, metaMask, STABLE_TESTNET_HEX, type Provider } from './metamask';
 import { PaymentStep } from './PaymentStep';
-import { Check, ArrowUpRight, Copy, ShieldCheck, Wallet, ChevronRight } from 'lucide-react';
+import {
+  Check,
+  ArrowUpRight,
+  Copy,
+  ShieldCheck,
+  Wallet,
+  ChevronRight,
+  ChevronDown,
+  X,
+} from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
@@ -37,16 +46,23 @@ function Step({
   title,
   summary,
   complete,
+  current,
   children,
 }: {
   number: number;
   title: string;
   summary: string;
   complete?: boolean;
+  current?: boolean;
   children: ReactNode;
 }) {
   return (
-    <AccordionItem value={String(number)} id={`step-${number}`} className="step-card">
+    <AccordionItem
+      value={String(number)}
+      id={`step-${number}`}
+      className="step-card"
+      data-current={current ? 'true' : undefined}
+    >
       <AccordionTrigger className="step-trigger">
         <span className="step-number" aria-hidden="true">
           {complete ? <Check size={17} /> : number}
@@ -56,7 +72,7 @@ function Step({
           <span className="step-summary">{summary}</span>
         </span>
         {complete && (
-          <Badge variant="secondary" className="complete-badge">
+          <Badge variant="outline" className="complete-badge">
             Complete
           </Badge>
         )}
@@ -87,6 +103,25 @@ const unresolved = (op?: OwnerOperation) =>
   !!op && ['prepared', 'submitted', 'unknown'].includes(op.status);
 const skillUrl = SKILL_URL;
 const skillPageUrl = SKILL_PAGE_URL;
+const MAIN_SITE_URL = 'https://stable.xyz/';
+const DOCS_URL = 'https://docs.stable.xyz/';
+const GITHUB_URL = 'https://github.com/stablelabs/agentic.stable.xyz';
+const FAUCET_URL = 'https://faucet.stable.xyz/';
+const CLI_COMMANDS = [
+  `npm install --global @stablechain/agent-wallet-cli@${CLI_VERSION}`,
+  'export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"',
+  'agent-wallet init --json',
+  'agent-wallet whoami --json',
+  'agent-wallet config import --file /absolute/path/wallet-config.json --json',
+  'agent-wallet allowance show --json',
+  'agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.001 --json',
+  'agent-wallet pay --payment-id PAYMENT_ID --json',
+];
+const formatBalance = (value: bigint) =>
+  new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatAmount(value)));
+type NetworkRequest =
+  | { state: 'idle' }
+  | { state: 'pending' | 'added' | 'failed'; message: string };
 export default function App() {
   const refreshId = useRef(0);
   const activeOwner = useRef<string | undefined>(undefined);
@@ -116,6 +151,12 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [openSteps, setOpenSteps] = useState<string[]>(['1']);
   const [selectedStep, setSelectedStep] = useState(1);
+  const [networkRequest, setNetworkRequest] = useState<NetworkRequest>({ state: 'idle' });
+  const networkRequestId = useRef(0);
+  const addNetworkInFlight = useRef<Promise<void> | undefined>(undefined);
+  const networkButton = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const walletCardRef = useRef<HTMLDivElement>(null);
   const pending = unresolved(operation);
   // Wallet identity is independent of network reads and signer-field validation.
   const connected = !!account && account.toLowerCase() === config?.alice.toLowerCase();
@@ -199,6 +240,16 @@ Tell me if your storage might not persist between sessions. Stop before making a
     setPromptCopyError('');
   }, [setupPrompt]);
 
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    const card = walletCardRef.current;
+    if (!sidebar || !card || typeof ResizeObserver === 'undefined') return;
+    const sync = () => sidebar.style.setProperty('--wallet-card-height', `${card.offsetHeight}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     fetch('/wallet-config.json', { cache: 'no-store' })
       .then(async (response) => {
@@ -356,22 +407,17 @@ Tell me if your storage might not persist between sessions. Stop before making a
       const selected = address(accounts[0], 'wallet account');
       const selectedConfig = validateConfig({ ...config, alice: selected });
       try {
-        await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x899' }] });
+        await p.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: STABLE_TESTNET_HEX }],
+        });
       } catch (e) {
         if ((e as { code?: number }).code !== 4902) throw e;
+        await addStableTestnet(p, config.rpcUrl);
         await p.request({
-          method: 'wallet_addEthereumChain',
-          params: [
-            {
-              chainId: '0x899',
-              chainName: chain.name,
-              nativeCurrency: chain.nativeCurrency,
-              rpcUrls: [config.rpcUrl],
-              blockExplorerUrls: [EXPLORER],
-            },
-          ],
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: STABLE_TESTNET_HEX }],
         });
-        await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x899' }] });
       }
       if (Number(await p.request({ method: 'eth_chainId' })) !== CHAIN_ID)
         throw new Error('Select Stable Testnet.');
@@ -392,6 +438,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setAccount(selected);
       setVerified(true);
       setNotice('');
+      setNetworkRequest((request) => (request.state === 'failed' ? { state: 'idle' } : request));
     } catch (e) {
       disconnect();
       setError(failure(e));
@@ -399,6 +446,60 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setBusy(false);
     }
   }
+  // Adds the network only: no account access, no chain switch request, no transaction.
+  // Repeated clicks join the request MetaMask is already showing instead of opening another.
+  async function addNetwork() {
+    const requestId = ++networkRequestId.current;
+    setNetworkRequest({ state: 'pending', message: 'Confirm Stable Testnet in MetaMask.' });
+    try {
+      addNetworkInFlight.current ??= metaMask()
+        .then((provider) => addStableTestnet(provider, config?.rpcUrl))
+        .finally(() => {
+          addNetworkInFlight.current = undefined;
+        });
+      await addNetworkInFlight.current;
+      if (requestId === networkRequestId.current)
+        setNetworkRequest({
+          state: 'added',
+          message: 'MetaMask accepted Stable Testnet (chain 2201).',
+        });
+    } catch (e) {
+      const code = (e as { code?: number }).code;
+      if (requestId === networkRequestId.current)
+        setNetworkRequest({
+          state: 'failed',
+          message:
+            code === 4001
+              ? 'The request was rejected in MetaMask. Stable Testnet was not added.'
+              : code === -32002
+                ? 'MetaMask already has a request open. Finish it in MetaMask, then try again.'
+                : failure(e),
+        });
+    }
+  }
+  function returnFocusFromToast() {
+    // preventScroll: on phones the header is not sticky, so a plain focus() would jump to the top.
+    if (document.activeElement?.closest('.toast'))
+      networkButton.current?.focus({ preventScroll: true });
+  }
+  function dismissNetworkRequest() {
+    returnFocusFromToast();
+    networkRequestId.current++;
+    setNetworkRequest({ state: 'idle' });
+  }
+  useEffect(() => {
+    if (networkRequest.state === 'idle') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismissNetworkRequest();
+    };
+    document.addEventListener('keydown', onKey);
+    const timer =
+      networkRequest.state === 'added' ? setTimeout(dismissNetworkRequest, 8000) : undefined;
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      clearTimeout(timer);
+    };
+  }, [networkRequest]);
   function downloadConfig() {
     if (!config || !connected) return;
     const settings = validateConfig({
@@ -500,32 +601,189 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setBusy(false);
     }
   }
+  const walletStatus = connected
+    ? verified
+      ? '✓ Token network verified'
+      : 'Wallet connected · network checks unavailable'
+    : verified
+      ? '✓ Token network verified'
+      : 'Checking Stable Testnet…';
   return (
     <div className="shell">
       <header className="site-header">
-        <a className="brand" href="/">
-          stable
-        </a>
-        <div className="header-links">
-          <Badge variant="outline">Stable Testnet · 2201</Badge>
-          <a
-            href="https://github.com/stablelabs/agentic.stable.xyz"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub <ArrowUpRight size={14} />
+        <div className="nav-row">
+          <a className="brand" href={MAIN_SITE_URL}>
+            <img src="/brand/stable-wordmark-light.svg" alt="Stable" width={93} height={24} />
           </a>
+          <nav className="header-links" aria-label="Resources">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+              GitHub <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
+            <a href={DOCS_URL} target="_blank" rel="noreferrer">
+              Docs <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
+          </nav>
+          <Button
+            ref={networkButton}
+            variant="outline"
+            className="network-button"
+            aria-describedby="network-button-help"
+            onClick={() => void addNetwork()}
+          >
+            Add Stable Testnet to wallet
+          </Button>
+          <span id="network-button-help" hidden>
+            Adds chain 2201 to MetaMask. Does not connect an account or send a transaction.
+          </span>
         </div>
       </header>
-      <main>
-        <div className="intro">
-          <h1>Agent payments</h1>
-          <p>
-            Give your agent a USDT0 allowance, then send a test payment.
+      <div className="demo-layout">
+        <section className="intro" aria-labelledby="intro-title">
+          <p className="eyebrow">Stable Testnet demo</p>
+          <h1 id="intro-title">Agent payments</h1>
+          <p className="lede">
+            This demo lets an AI agent pay in USDT0 on Stable Testnet. You connect MetaMask,
+            give an agent a USDT0 allowance, fund its gas, then hand off a test payment for the
+            agent to send.
           </p>
-        </div>
-        <div className="demo-layout">
-          <aside className="journey-sidebar">
+          <p>
+            The payment is an ERC-20 <code>transferFrom</code> from your wallet, capped by the
+            allowance, so your USDT0 stays with you until the agent pays. The agent signs with
+            the agent-wallet CLI and keeps its key on its own machine. Approval and gas funding
+            are separate MetaMask transactions. This page never sends the payment; the agent
+            does, and returns a receipt you can check on StableScan.
+          </p>
+          <p className="intro-needs">
+            You need MetaMask, test USDT0 and an agent that can run Node.js 22+ with persistent
+            storage.
+          </p>
+          <div className="intro-actions">
+            <Button asChild variant="outline">
+              <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+                Get test USDT0 <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+            </Button>
+          </div>
+        </section>
+        <aside ref={sidebarRef} className="sidebar" aria-label="Wallet and resources">
+          <Card
+            ref={walletCardRef}
+            className="wallet-card"
+            role="region"
+            aria-label="Wallet owner"
+          >
+            <div className="wallet-card-head">
+              <p className="eyebrow">Wallet owner</p>
+              <span
+                className={connected && verified ? 'status-dot online' : 'status-dot'}
+                aria-hidden="true"
+              />
+            </div>
+            <p className="address">{account || 'Not connected'}</p>
+            {connected && (
+              <p className="owner-balance" aria-live="polite">
+                {ownerBalance !== undefined ? (
+                  <>
+                    <span className="balance-amount">{formatBalance(ownerBalance)}</span>{' '}
+                    <span className="balance-unit">USDT0 available</span>
+                  </>
+                ) : (
+                  <span className="balance-unit">
+                    {networkError ? 'Balance unavailable' : 'Checking balance…'}
+                  </span>
+                )}
+              </p>
+            )}
+            <p className={verified ? 'account-meta verified' : 'account-meta'}>{walletStatus}</p>
+            <div className="actions wallet-actions">
+              <Button disabled={busy || !config || connected} onClick={() => void connect()}>
+                <Wallet size={16} aria-hidden="true" />
+                {connected ? 'Owner connected' : busy ? 'Connecting…' : 'Connect MetaMask'}
+              </Button>
+              {account && (
+                <Button variant="ghost" disabled={busy} onClick={disconnect}>
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </Card>
+          {(storageError || error || networkError || notice || operation?.hash || pending) && (
+            <div className="sidebar-messages">
+              {(storageError || error || networkError) && (
+                <Alert variant="destructive" className="message error">
+                  <AlertDescription>
+                    {storageError || error || networkError}
+                    {networkError && (
+                      <Button
+                        variant="outline"
+                        disabled={busy || refreshing}
+                        onClick={() => void refresh()}
+                      >
+                        Retry network check
+                      </Button>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {notice && (
+                <div className="message" role="status">
+                  {notice}
+                </div>
+              )}
+              {operation?.hash && (
+                <p className="transaction">
+                  Transaction:{' '}
+                  <a href={`${EXPLORER}/tx/${operation.hash}`} target="_blank" rel="noreferrer">
+                    {operation.hash} <ArrowUpRight size={12} aria-hidden="true" />
+                  </a>
+                </p>
+              )}
+              {pending && (
+                <section className="message recovery" aria-label="Pending operation">
+                  <h2>Unverified transaction</h2>
+                  <p>
+                    {operation!.action === 'fund' ? 'Gas transfer' : 'Token approval'} unverified.
+                    New submissions blocked until confirmed.
+                  </p>
+                  <p>
+                    Agent: <span className="address">{operation!.intent.agent}</span>
+                    <br />
+                    Amount:{' '}
+                    {formatUnits(
+                      BigInt(operation!.intent.amount),
+                      operation!.action === 'fund' ? 18 : 6,
+                    )}{' '}
+                    {operation!.action === 'fund' ? 'native USDT0' : 'USDT0'}
+                  </p>
+                  {operation!.hash ? (
+                    <Button variant="outline" disabled={busy} onClick={() => void reconcile()}>
+                      Check confirmation
+                    </Button>
+                  ) : (
+                    <form onSubmit={(event) => void reconcile(event)}>
+                      <label>
+                        Transaction hash from MetaMask
+                        <Input
+                          required
+                          value={recoveredHash}
+                          onChange={(e) => setRecoveredHash(e.target.value)}
+                          placeholder="0x…"
+                        />
+                      </label>
+                      <Button disabled={busy} type="submit">
+                        Verify transaction
+                      </Button>
+                      <p>
+                        Keep this record. Check MetaMask history; do not submit a replacement
+                        transaction while the outcome is unknown.
+                      </p>
+                    </form>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
+          <div className="journey">
             <p className="eyebrow">Steps</p>
             <ol className="journey-nav" aria-label="Demo progress">
               {stages.map((name, index) => (
@@ -545,470 +803,442 @@ Tell me if your storage might not persist between sessions. Stop before making a
                 </li>
               ))}
             </ol>
-            <div className="sidebar-note">
+          </div>
+          <ul className="resource-links" aria-label="Agent and explorer">
+            <li>
               <a href={skillPageUrl} target="_blank" rel="noreferrer">
-                Agent skill <ArrowUpRight size={14} />
+                Agent skill <ArrowUpRight size={14} aria-hidden="true" />
               </a>
-            </div>
-          </aside>
-          <div className="main-column">
-            <Card className="wallet-strip" role="region" aria-label="Wallet owner">
-              <div>
-                <p className="eyebrow">Owner</p>
-                <p className="address">{account || 'Not connected'}</p>
-                <p className="account-meta">
-                  {connected
-                    ? verified
-                      ? '✓ Token network verified'
-                      : 'Wallet connected · network checks unavailable'
-                    : verified
-                      ? '✓ Token network verified'
-                      : 'Checking Stable Testnet…'}
-                  {ownerBalance !== undefined
-                    ? ` · ${new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatAmount(ownerBalance)))} USDT0 available`
-                    : ''}
-                </p>
-              </div>
-              <div className="actions">
-                <Button disabled={busy || !config || connected} onClick={() => void connect()}>
-                  <Wallet size={16} aria-hidden="true" />
-                  {connected ? 'Owner connected' : busy ? 'Connecting…' : 'Connect MetaMask'}
-                </Button>
-                {account && (
-                  <Button variant="ghost" disabled={busy} onClick={disconnect}>
-                    Disconnect
-                  </Button>
-                )}
-              </div>
-            </Card>
-            {(storageError || error || networkError) && (
-              <Alert variant="destructive" className="message error">
-                <AlertDescription>
-                  {storageError || error || networkError}
-                  {networkError && (
-                    <Button
-                      variant="outline"
-                      disabled={busy || refreshing}
-                      onClick={() => void refresh()}
-                    >
-                      Retry network check
-                    </Button>
-                  )}
-                </AlertDescription>
-              </Alert>
-            )}
-            {notice && (
-              <div className="message" role="status">
-                {notice}
-              </div>
-            )}
-            {operation?.hash && (
-              <p className="transaction">
-                Transaction:{' '}
-                <a href={`${EXPLORER}/tx/${operation.hash}`} target="_blank" rel="noreferrer">
-                  {operation.hash} ↗
-                </a>
-              </p>
-            )}
-            {pending && (
-              <section className="message recovery" aria-label="Pending operation">
-                <h2>Unverified transaction</h2>
-                <p>
-                  {operation!.action === 'fund' ? 'Gas transfer' : 'Token approval'} unverified. New
-                  submissions blocked until confirmed.
-                </p>
-                <p>
-                  Agent: {operation!.intent.agent}
-                  <br />
-                  Amount:{' '}
-                  {formatUnits(
-                    BigInt(operation!.intent.amount),
-                    operation!.action === 'fund' ? 18 : 6,
-                  )}{' '}
-                  {operation!.action === 'fund' ? 'native USDT0' : 'USDT0'}
-                </p>
-                {operation!.hash ? (
-                  <Button variant="outline" disabled={busy} onClick={() => void reconcile()}>
-                    Check confirmation
-                  </Button>
-                ) : (
-                  <form onSubmit={(event) => void reconcile(event)}>
-                    <label>
-                      Transaction hash from MetaMask
-                      <Input
-                        required
-                        value={recoveredHash}
-                        onChange={(e) => setRecoveredHash(e.target.value)}
-                        placeholder="0x…"
-                      />
-                    </label>
-                    <Button disabled={busy} type="submit">
-                      Verify transaction
-                    </Button>
-                    <p>
-                      Keep this record. Check MetaMask history; do not submit a replacement
-                      transaction while the outcome is unknown.
-                    </p>
-                  </form>
-                )}
-              </section>
-            )}
-            <div className="walkthrough-heading">
-              <p>
-                Step {selectedStep} of 5 <span>· {stages[selectedStep - 1]}</span>
-              </p>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setOpenSteps(allSteps ? [String(selectedStep)] : ['1', '2', '3', '4', '5'])
-                }
-              >
-                {allSteps ? 'Focus current step' : 'Show all steps'}
-              </Button>
-            </div>
-            <Accordion
-              type="multiple"
-              value={openSteps}
-              onValueChange={(steps) => {
-                const opened = steps.find((step) => !openSteps.includes(step));
-                if (opened) setSelectedStep(Number(opened));
-                setOpenSteps(steps);
+            </li>
+            <li>
+              <a href={EXPLORER} target="_blank" rel="noreferrer">
+                StableScan Testnet <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+            </li>
+          </ul>
+          <section className="cli-panel" aria-label="CLI">
+            <details
+              onToggle={(event) => {
+                if (event.currentTarget.open)
+                  event.currentTarget.scrollIntoView({ block: 'nearest' });
               }}
-              className="walkthrough"
             >
-              <Step
-                number={1}
-                title="Connect wallet"
-                summary={connected ? 'Connected' : 'MetaMask · chain 2201'}
-                complete={connected}
-              >
-                <ul className="requirements">
-                  <li>
-                    <strong>MetaMask</strong>
-                    <span>
-                      Extension or mobile browser.{' '}
-                      <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
-                        Install ↗
-                      </a>
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Test USDT0</strong>
-                    <span>
-                      <a href="https://faucet.stable.xyz" target="_blank" rel="noreferrer">
-                        Faucet ↗
-                      </a>
-                    </span>
-                  </li>
-                  <li>
-                    <strong>Agent</strong>
-                    <span>Terminal, Node.js 22+, persistent signer storage.</span>
-                  </li>
-                </ul>
+              <summary>
+                <span>CLI</span>
+                <span className="cli-version">v{CLI_VERSION}</span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </summary>
+              <div className="manual-body">
+                <p>Node.js 22+. Reuse the signer’s original absolute state directory.</p>
+                <pre>
+                  <code>
+                    {CLI_COMMANDS.map((command) => (
+                      <span className="cli-line" key={command}>
+                        {command}
+                      </span>
+                    ))}
+                  </code>
+                </pre>
                 <p className="form-note">
-                  Connection shares your address only. MetaMask confirms approvals and funding
-                  separately.
-                </p>
-              </Step>
-              <Step
-                number={2}
-                title="Configure signer"
-                summary={selectedAgent ? 'Address set' : 'Local CLI · Node.js 22+'}
-                complete={!!selectedAgent}
-              >
-                <section aria-label="Configure signer">
-                  <p>
-                    Paste the setup prompt into your agent chat. Open the returned approval link
-                    here.
-                  </p>
-                  <label htmlFor="allowance-amount">Allowance amount (USDT0)</label>
-                  <Input
-                    id="allowance-amount"
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    disabled={busy || pending}
-                    aria-invalid={!!amountError}
-                    aria-describedby="allowance-help"
-                  />
-                  <p id="allowance-help" className={amountError ? 'field-error' : 'form-note'}>
-                    {amountError}
-                  </p>
-                  <div className="actions">
-                    <Button disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>
-                      <Copy size={16} aria-hidden="true" />
-                      {promptCopied ? 'Setup prompt copied' : 'Copy setup prompt'}
-                    </Button>
-                    <a href={skillPageUrl} target="_blank" rel="noreferrer">
-                      View skill ↗
-                    </a>
-                  </div>
-                  <p className="form-note" aria-live="polite">
-                    {!connected
-                      ? 'Connect MetaMask.'
-                      : !setupPrompt
-                        ? 'Enter a valid allowance amount.'
-                        : promptCopyError ||
-                          (promptCopied
-                            ? 'Paste in your agent chat; open its approval link.'
-                            : 'Setup does not send payments.')}
-                  </p>
-                  {setupPrompt && (
-                    <details className="setup-prompt" open={promptCopyError ? true : undefined}>
-                      <summary>Setup prompt</summary>
-                      <Textarea
-                        aria-label="Agent setup prompt"
-                        readOnly
-                        value={setupPrompt}
-                        rows={9}
-                        onFocus={(event) => event.currentTarget.select()}
-                      />
-                    </details>
-                  )}
-                  <div className="field-divider">
-                    <span>Existing signer</span>
-                  </div>
-                  <label htmlFor="agent-signer">Agent signer</label>
-                  <Input
-                    id="agent-signer"
-                    aria-label="Agent signer"
-                    value={agent}
-                    onChange={(e) => {
-                      setAgent(e.target.value);
-                      setAllowance(undefined);
-                      setGasBalance(undefined);
-                    }}
-                    disabled={busy || pending}
-                    placeholder="0x…"
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={!!agentError}
-                    aria-describedby="agent-help"
-                  />
-                  <p id="agent-help" className={agentError ? 'field-error' : 'form-note'}>
-                    {agentError || 'Signer address only. Keep the private key local.'}
-                  </p>
-                  <Button
-                    variant="outline"
-                    disabled={!connected || busy || !!agentError}
-                    onClick={() => {
-                      try {
-                        downloadConfig();
-                      } catch (e) {
-                        setError(failure(e));
-                      }
-                    }}
+                  Download settings in step 2. Replace recipient and payment ID. Recover uncertain
+                  payments with the same ID and signer directory.{' '}
+                  <a
+                    href={`https://www.npmjs.com/package/@stablechain/agent-wallet-cli/v/${CLI_VERSION}`}
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    Download wallet settings
+                    CLI reference <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>
+                </p>
+              </div>
+            </details>
+          </section>
+        </aside>
+        <main className="main-column">
+          <div className="walkthrough-toolbar">
+            <p className="eyebrow">Walkthrough</p>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                setOpenSteps(allSteps ? [String(selectedStep)] : ['1', '2', '3', '4', '5'])
+              }
+            >
+              {allSteps ? 'Focus current step' : 'Show all steps'}
+            </Button>
+          </div>
+          <Accordion
+            type="multiple"
+            value={openSteps}
+            onValueChange={(steps) => {
+              const opened = steps.find((step) => !openSteps.includes(step));
+              if (opened) setSelectedStep(Number(opened));
+              setOpenSteps(steps);
+            }}
+            className="walkthrough"
+          >
+            <Step
+              number={1}
+              current={selectedStep === 1}
+              title="Connect wallet"
+              summary={connected ? 'Connected' : 'MetaMask · chain 2201'}
+              complete={connected}
+            >
+              <ul className="requirements">
+                <li>
+                  <strong>MetaMask</strong>
+                  <span>
+                    Extension or mobile browser.{' '}
+                    <a href="https://metamask.io/download/" target="_blank" rel="noreferrer">
+                      Install <ArrowUpRight size={14} aria-hidden="true" />
+                    </a>
+                  </span>
+                </li>
+                <li>
+                  <strong>Stable Testnet</strong>
+                  <span>
+                    Chain 2201. Connecting adds it if MetaMask does not have it, or use Add Stable
+                    Testnet to wallet at the top of the page.
+                  </span>
+                </li>
+                <li>
+                  <strong>Test USDT0</strong>
+                  <span>
+                    Funds the test payment and gas.{' '}
+                    <a href={FAUCET_URL} target="_blank" rel="noreferrer">
+                      Faucet <ArrowUpRight size={14} aria-hidden="true" />
+                    </a>
+                  </span>
+                </li>
+                <li>
+                  <strong>Agent</strong>
+                  <span>Terminal, Node.js 22+, persistent signer storage.</span>
+                </li>
+              </ul>
+              <p className="form-note">
+                Use Connect MetaMask in the wallet panel. Connection shares your address only.
+                MetaMask confirms approvals and funding separately.
+              </p>
+            </Step>
+            <Step
+              number={2}
+              current={selectedStep === 2}
+              title="Configure signer"
+              summary={selectedAgent ? 'Address set' : 'Local CLI · Node.js 22+'}
+              complete={!!selectedAgent}
+            >
+              <section aria-label="Configure signer">
+                <p>
+                  Paste the setup prompt into your agent chat. Open the returned approval link here.
+                </p>
+                <label htmlFor="allowance-amount">Allowance amount (USDT0)</label>
+                <Input
+                  id="allowance-amount"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={busy || pending}
+                  aria-invalid={!!amountError}
+                  aria-describedby="allowance-help"
+                />
+                <p id="allowance-help" className={amountError ? 'field-error' : 'form-note'}>
+                  {amountError}
+                </p>
+                <div className="actions">
+                  <Button disabled={!setupPrompt || busy} onClick={() => void copySetupPrompt()}>
+                    <Copy size={16} aria-hidden="true" />
+                    {promptCopied ? 'Setup prompt copied' : 'Copy setup prompt'}
                   </Button>
-                  <p className="form-note">Public owner, token, RPC and signer settings.</p>
-                </section>
-              </Step>
-              <Step
-                number={3}
-                title="Approve allowance"
-                summary={
-                  allowance && allowance > 0n
-                    ? `${formatAmount(allowance)} USDT0 remaining`
-                    : 'ERC-20 approve'
-                }
-                complete={allowance !== undefined && allowance > 0n}
-              >
-                <form
-                  id="agent-allowance"
-                  aria-label="Approve agent"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void submit('approve');
+                  <a href={skillPageUrl} target="_blank" rel="noreferrer">
+                    View skill <ArrowUpRight size={14} aria-hidden="true" />
+                  </a>
+                </div>
+                <p className="form-note" aria-live="polite">
+                  {!connected
+                    ? 'Connect MetaMask.'
+                    : !setupPrompt
+                      ? 'Enter a valid allowance amount.'
+                      : promptCopyError ||
+                        (promptCopied
+                          ? 'Paste in your agent chat; open its approval link.'
+                          : 'Setup does not send payments.')}
+                </p>
+                {setupPrompt && (
+                  <details className="setup-prompt" open={promptCopyError ? true : undefined}>
+                    <summary>Setup prompt</summary>
+                    <Textarea
+                      aria-label="Agent setup prompt"
+                      readOnly
+                      value={setupPrompt}
+                      rows={9}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                  </details>
+                )}
+                <div className="field-divider">
+                  <span>Existing signer</span>
+                </div>
+                <label htmlFor="agent-signer">Agent signer</label>
+                <Input
+                  id="agent-signer"
+                  aria-label="Agent signer"
+                  value={agent}
+                  onChange={(e) => {
+                    setAgent(e.target.value);
+                    setAllowance(undefined);
+                    setGasBalance(undefined);
+                  }}
+                  disabled={busy || pending}
+                  placeholder="0x…"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-invalid={!!agentError}
+                  aria-describedby="agent-help"
+                />
+                <p id="agent-help" className={agentError ? 'field-error' : 'form-note'}>
+                  {agentError || 'Signer address only. Keep the private key local.'}
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={!connected || busy || !!agentError}
+                  onClick={() => {
+                    try {
+                      downloadConfig();
+                    } catch (e) {
+                      setError(failure(e));
+                    }
                   }}
                 >
-                  <div className="review-grid">
-                    <div>
-                      <span>Agent</span>
-                      <strong className="address">
-                        {selectedAgent || 'Add an agent address in step 2'}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Spending limit</span>
-                      <strong>
-                        {amountError ? 'Choose a valid amount in step 2' : `${amount} USDT0`}
-                      </strong>
-                      <Button type="button" variant="link" onClick={() => showStep(2)}>
-                        Change limit
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="permission-note">
-                    <ShieldCheck size={18} aria-hidden="true" />
-                    <div>
-                      <strong>Allowance scope</strong>
-                      <p>
-                        Any recipient. No expiry. Revocation applies after confirmation; completed
-                        transfers are final.
-                      </p>
-                    </div>
-                  </div>
-                  <p aria-live="polite">
-                    Remaining token allowance:{' '}
-                    <strong>
-                      {!selectedAgent
-                        ? 'Enter an agent address'
-                        : allowance === undefined
-                          ? 'Unavailable'
-                          : `${formatAmount(allowance)} USDT0`}
+                  Download wallet settings
+                </Button>
+                <p className="form-note">Public owner, token, RPC and signer settings.</p>
+              </section>
+            </Step>
+            <Step
+              number={3}
+              current={selectedStep === 3}
+              title="Approve allowance"
+              summary={
+                allowance && allowance > 0n
+                  ? `${formatAmount(allowance)} USDT0 remaining`
+                  : 'ERC-20 approve'
+              }
+              complete={allowance !== undefined && allowance > 0n}
+            >
+              <form
+                id="agent-allowance"
+                aria-label="Approve agent"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submit('approve');
+                }}
+              >
+                <div className="review-grid">
+                  <div>
+                    <span>Agent</span>
+                    <strong className="address">
+                      {selectedAgent || 'Add an agent address in step 2'}
                     </strong>
-                  </p>
-                  {allowance !== undefined && allowance > 0n && (
-                    <p className="form-note">
-                      To change a nonzero allowance: revoke, wait for confirmation, then approve
-                      again.
+                  </div>
+                  <div>
+                    <span>Spending limit</span>
+                    <strong>
+                      {amountError ? 'Choose a valid amount in step 2' : `${amount} USDT0`}
+                    </strong>
+                    <Button type="button" variant="link" onClick={() => showStep(2)}>
+                      Change limit
+                    </Button>
+                  </div>
+                </div>
+                <div className="permission-note">
+                  <ShieldCheck size={18} aria-hidden="true" />
+                  <div>
+                    <strong>Allowance scope</strong>
+                    <p>
+                      Any recipient. No expiry. Revocation applies after confirmation; completed
+                      transfers are final.
                     </p>
-                  )}
-                  <div className="actions">
-                    <Button
-                      type="submit"
-                      disabled={
-                        walletBlocked ||
-                        !selectedAgent ||
-                        !!amountError ||
-                        allowance === undefined ||
-                        allowance > 0n
-                      }
-                    >
-                      Approve agent
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      disabled={walletBlocked || allowance === undefined || allowance === 0n}
-                      onClick={() => void submit('revoke')}
-                    >
-                      Revoke allowance
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      disabled={busy || !config || refreshing}
-                      onClick={() => void refresh()}
-                    >
-                      {refreshing ? 'Refreshing…' : 'Refresh'}
-                    </Button>
                   </div>
+                </div>
+                <p aria-live="polite">
+                  Remaining token allowance:{' '}
+                  <strong>
+                    {!selectedAgent
+                      ? 'Enter an agent address'
+                      : allowance === undefined
+                        ? 'Unavailable'
+                        : `${formatAmount(allowance)} USDT0`}
+                  </strong>
+                </p>
+                {allowance !== undefined && allowance > 0n && (
                   <p className="form-note">
-                    {!connected
-                      ? 'Connect MetaMask.'
-                      : !selectedAgent
-                        ? 'Set the signer in step 2.'
-                        : 'Approval leaves tokens in the owner wallet. Owner pays gas.'}
+                    To change a nonzero allowance: revoke, wait for confirmation, then approve
+                    again.
                   </p>
-                </form>
-              </Step>
-              <Step
-                number={4}
-                title="Fund gas"
-                summary={
-                  gasBalance !== undefined && gasBalance > 0n
-                    ? `${formatUnits(gasBalance, 18)} native USDT0`
-                    : 'Native USDT0'
-                }
-                complete={gasBalance !== undefined && gasBalance > 0n}
-              >
-                <form
-                  aria-label="Agent gas"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void submit('fund');
-                  }}
-                >
-                  <p>
-                    Agent gas balance:{' '}
-                    <strong>
-                      {!selectedAgent
-                        ? 'Enter an agent address'
-                        : gasBalance === undefined
-                          ? 'Unavailable'
-                          : `${formatUnits(gasBalance, 18)} native USDT0`}
-                    </strong>
-                  </p>
-                  <p className="form-note">
-                    Native USDT0 for the agent’s fees, outside its token allowance. Revocation does
-                    not return this balance.
-                  </p>
-                  <label htmlFor="gas-amount">Gas top-up (native USDT0)</label>
-                  <Input
-                    id="gas-amount"
-                    inputMode="decimal"
-                    value={gasAmount}
-                    onChange={(e) => setGasAmount(e.target.value)}
-                    disabled={busy || pending}
-                    aria-invalid={!!gasError}
-                    aria-describedby="gas-help"
-                  />
-                  <p id="gas-help" className={gasError ? 'field-error' : 'form-note'}>
-                    {gasError || 'Manual top-up, not a fee estimate.'}
-                  </p>
+                )}
+                <div className="actions">
                   <Button
                     type="submit"
                     disabled={
-                      walletBlocked || !selectedAgent || !!gasError || allowance === undefined
+                      walletBlocked ||
+                      !selectedAgent ||
+                      !!amountError ||
+                      allowance === undefined ||
+                      allowance > 0n
                     }
                   >
-                    Fund agent gas
+                    Approve agent
                   </Button>
-                </form>
-              </Step>
-              <Step number={5} title="Send payment" summary="Agent-signed transferFrom">
-                <PaymentStep
-                  config={connected ? config : undefined}
-                  agent={agent}
-                  allowance={allowance}
-                  ownerBalance={ownerBalance}
-                  gasBalance={gasBalance}
-                  blocked={busy || pending || !storageReady || !verified || !!networkError}
-                  blockedReason={
-                    !verified || networkError
-                      ? 'Network check failed. Retry before preparing a payment.'
-                      : undefined
-                  }
-                />
-              </Step>
-            </Accordion>
-            <section className="manual-section" aria-label="CLI">
-              <details>
-                <summary>CLI</summary>
-                <div className="manual-body">
-                  <p>Node.js 22+. Reuse the signer’s original absolute state directory.</p>
-                  <pre>
-                    <code>{`npm install --global @stablechain/agent-wallet-cli@${CLI_VERSION}
-export WALLET_STATE_DIR="$HOME/.agent-wallet-erc20"
-agent-wallet init --json
-agent-wallet whoami --json
-agent-wallet config import --file /absolute/path/wallet-config.json --json
-agent-wallet allowance show --json
-agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.001 --json
-agent-wallet pay --payment-id PAYMENT_ID --json`}</code>
-                  </pre>
-                  <p className="form-note">
-                    Download settings in step 2. Replace recipient and payment ID. Recover uncertain
-                    payments with the same ID and signer directory.{' '}
-                    <a
-                      href={`https://www.npmjs.com/package/@stablechain/agent-wallet-cli/v/${CLI_VERSION}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      CLI reference ↗
-                    </a>
-                  </p>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={walletBlocked || allowance === undefined || allowance === 0n}
+                    onClick={() => void submit('revoke')}
+                  >
+                    Revoke allowance
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    disabled={busy || !config || refreshing}
+                    onClick={() => void refresh()}
+                  >
+                    {refreshing ? 'Refreshing…' : 'Refresh'}
+                  </Button>
                 </div>
-              </details>
-            </section>
+                <p className="form-note">
+                  {!connected
+                    ? 'Connect MetaMask.'
+                    : !selectedAgent
+                      ? 'Set the signer in step 2.'
+                      : 'Approval leaves tokens in the owner wallet. Owner pays gas.'}
+                </p>
+              </form>
+            </Step>
+            <Step
+              number={4}
+              current={selectedStep === 4}
+              title="Fund gas"
+              summary={
+                gasBalance !== undefined && gasBalance > 0n
+                  ? `${formatUnits(gasBalance, 18)} native USDT0`
+                  : 'Native USDT0'
+              }
+              complete={gasBalance !== undefined && gasBalance > 0n}
+            >
+              <form
+                aria-label="Agent gas"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submit('fund');
+                }}
+              >
+                <p>
+                  Agent gas balance:{' '}
+                  <strong>
+                    {!selectedAgent
+                      ? 'Enter an agent address'
+                      : gasBalance === undefined
+                        ? 'Unavailable'
+                        : `${formatUnits(gasBalance, 18)} native USDT0`}
+                  </strong>
+                </p>
+                <p className="form-note">
+                  Native USDT0 for the agent’s fees, outside its token allowance. Revocation does
+                  not return this balance.
+                </p>
+                <label htmlFor="gas-amount">Gas top-up (native USDT0)</label>
+                <Input
+                  id="gas-amount"
+                  inputMode="decimal"
+                  value={gasAmount}
+                  onChange={(e) => setGasAmount(e.target.value)}
+                  disabled={busy || pending}
+                  aria-invalid={!!gasError}
+                  aria-describedby="gas-help"
+                />
+                <p id="gas-help" className={gasError ? 'field-error' : 'form-note'}>
+                  {gasError || 'Manual top-up, not a fee estimate.'}
+                </p>
+                <Button
+                  type="submit"
+                  disabled={
+                    walletBlocked || !selectedAgent || !!gasError || allowance === undefined
+                  }
+                >
+                  Fund agent gas
+                </Button>
+              </form>
+            </Step>
+            <Step
+              number={5}
+              current={selectedStep === 5}
+              title="Send payment"
+              summary="Agent-signed transferFrom"
+            >
+              <PaymentStep
+                config={connected ? config : undefined}
+                agent={agent}
+                allowance={allowance}
+                ownerBalance={ownerBalance}
+                gasBalance={gasBalance}
+                blocked={busy || pending || !storageReady || !verified || !!networkError}
+                blockedReason={
+                  !verified || networkError
+                    ? 'Network check failed. Retry before preparing a payment.'
+                    : undefined
+                }
+              />
+            </Step>
+          </Accordion>
+        </main>
+        <footer className="site-footer">
+          <p>Test USDT0 only. Testnet demo; unaudited.</p>
+          <p>
+            <a href={MAIN_SITE_URL}>stable.xyz</a>
+          </p>
+        </footer>
+      </div>
+      {networkRequest.state !== 'idle' && (
+        <div
+          className={`toast toast-${networkRequest.state}`}
+          role={networkRequest.state === 'failed' ? 'alert' : 'status'}
+          aria-label="Add Stable Testnet"
+        >
+          <div className="toast-head">
+            {networkRequest.state === 'pending' && (
+              <span className="toast-spinner" aria-hidden="true" />
+            )}
+            <p className="toast-title">
+              {networkRequest.state === 'pending'
+                ? 'Waiting for MetaMask'
+                : networkRequest.state === 'added'
+                  ? 'Stable Testnet ready'
+                  : 'Stable Testnet not added'}
+            </p>
+            <button
+              type="button"
+              className="toast-close"
+              aria-label="Dismiss"
+              onClick={dismissNetworkRequest}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
           </div>
+          <p className="toast-text">{networkRequest.message}</p>
+          {networkRequest.state === 'failed' && (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => {
+                returnFocusFromToast();
+                void addNetwork();
+              }}
+            >
+              Try again
+            </button>
+          )}
         </div>
-      </main>
-      <footer>
-        <p>Test USDT0 only.</p>
-      </footer>
+      )}
     </div>
   );
 }

@@ -15,6 +15,13 @@ const agent = '0x2222222222222222222222222222222222222222';
 const other = '0x3333333333333333333333333333333333333333';
 const rpcUrl = 'https://rpc.agent-wallet.invalid';
 const blockHash = keccak256('0x03');
+const stableTestnetParams = {
+  chainId: '0x899',
+  chainName: 'Stable Testnet',
+  nativeCurrency: { name: 'USDT0', symbol: 'USDT0', decimals: 18 },
+  rpcUrls: [rpcUrl],
+  blockExplorerUrls: ['https://testnet.stablescan.xyz'],
+};
 const config = {
   schemaVersion: 2,
   chainId: 2201,
@@ -60,10 +67,12 @@ async function fixture(
     emptyAccounts?: boolean;
     unknownChain?: boolean;
     rejectSwitch?: boolean;
+    rejectAddChainOnce?: boolean;
+    ownerTokenBalance?: bigint;
   } = {},
 ) {
   const walletOwner = options.account || alice;
-  const { allowance: initialAllowance, ...walletOptions } = options;
+  const { allowance: initialAllowance, ownerTokenBalance, ...walletOptions } = options;
   const allowances = new Map([[walletOwner, initialAllowance ?? 0n]]);
   let gas = 0n;
   const submissions: Tx[] = [];
@@ -133,7 +142,11 @@ async function fixture(
         const values: any = {
           decimals: 6,
           symbol: 'USDT0',
-          balanceOf: 1_000_000n,
+          balanceOf:
+            decoded.functionName === 'balanceOf' &&
+            decoded.args[0].toLowerCase() === walletOwner.toLowerCase()
+              ? (ownerTokenBalance ?? 1_000_000n)
+              : 7n,
           allowance:
             decoded.functionName === 'allowance'
               ? (allowances.get(decoded.args[0].toLowerCase()) ?? 0n)
@@ -199,6 +212,7 @@ async function fixture(
       const listeners: Record<string, (() => void)[]> = {};
       let chainId = options.unknownChain ? '0x1' : '0x899';
       let added = !options.unknownChain;
+      let addRejections = options.rejectAddChainOnce ? 1 : 0;
       (window as any).walletTestRequests = [];
       const provider = {
         isMetaMask: true,
@@ -218,6 +232,10 @@ async function fixture(
             return null;
           }
           if (method === 'wallet_addEthereumChain') {
+            if (addRejections > 0) {
+              addRejections--;
+              throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            }
             added = true;
             return null;
           }
@@ -465,13 +483,8 @@ test('adds Stable Testnet and switches before enabling wallet actions', async ({
   await fixture(page, { unknownChain: true });
   await connect(page);
   const requests = await page.evaluate(() => (window as any).walletTestRequests);
-  expect(requests.find((r: any) => r.method === 'wallet_addEthereumChain').params[0]).toMatchObject(
-    {
-      chainId: '0x899',
-      chainName: 'Stable Testnet',
-      rpcUrls: [rpcUrl],
-      nativeCurrency: { symbol: 'USDT0', decimals: 18 },
-    },
+  expect(requests.find((r: any) => r.method === 'wallet_addEthereumChain').params[0]).toEqual(
+    stableTestnetParams,
   );
   await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
 });
@@ -760,6 +773,9 @@ test('an RPC outage retains wallet identity while blocking spending until checks
   await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText(
     'network checks unavailable',
   );
+  await expect(
+    page.getByRole('region', { name: 'Wallet owner' }).locator('.owner-balance'),
+  ).toHaveText('Balance unavailable');
   await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Fund agent gas', exact: true })).toBeDisabled();
   expect(submissions).toHaveLength(0);
@@ -782,7 +798,8 @@ test('highlights the selected step independently of wallet progress', async ({ p
     await expect(current).toHaveCount(1);
     await expect(link).toHaveAttribute('aria-current', 'step');
     await expect(page.locator('#step-' + number)).toHaveAttribute('data-state', 'open');
-    await expect(page.locator('.walkthrough-heading')).toContainText(`Step ${number} of 5`);
+    // The numbered links and open card mark the step; there is no separate step counter.
+    await expect(page.getByText(/Step \d of 5/)).toHaveCount(0);
   }
   // Opening a card directly also selects it; expanding all cards preserves that selection.
   await page
@@ -848,4 +865,337 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('freeze-mobile-handoff.png'), fullPage: true });
+});
+
+const walletRequests = (page: Page) =>
+  page.evaluate(
+    () => (window as any).walletTestRequests as { method: string; params?: any[] }[],
+  );
+const addNetworkButton = (page: Page) =>
+  page.getByRole('button', { name: 'Add Stable Testnet to wallet', exact: true });
+
+test('adds Stable Testnet from the header before connecting, without account access or transactions', async ({
+  page,
+}) => {
+  const submissions = await fixture(page, { unknownChain: true });
+  await page.goto('/');
+  await expect(page.getByText('Stable Testnet · 2201')).toHaveCount(0);
+  // Settings have loaded once Connect is enabled, so the request uses the configured RPC.
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await expect(addNetworkButton(page)).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet (chain 2201).',
+  );
+  const requests = await walletRequests(page);
+  expect(requests.map((request) => request.method)).toEqual(['wallet_addEthereumChain']);
+  expect(requests[0].params![0]).toEqual(stableTestnetParams);
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText('Not connected');
+  // The existing connect, switch and verify flow still runs afterwards.
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  const methods = (await walletRequests(page)).map((request) => request.method);
+  expect(methods.filter((method) => method === 'wallet_addEthereumChain')).toHaveLength(1);
+  expect(methods).toContain('wallet_switchEthereumChain');
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+  expect(submissions).toHaveLength(0);
+});
+
+test('shows missing MetaMask when adding the network and keeps the action retryable', async ({
+  page,
+}) => {
+  await fixture(page, { missingWallet: true });
+  await page.goto('/');
+  await addNetworkButton(page).click();
+  const failed = page.getByRole('alert', { name: 'Add Stable Testnet' });
+  await expect(failed).toContainText('MetaMask was not found');
+  await expect(failed.getByRole('button', { name: 'Try again' })).toBeEnabled();
+  await expect(addNetworkButton(page)).toBeEnabled();
+  await failed.getByRole('button', { name: 'Dismiss' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(failed).toHaveCount(0);
+  await expect(addNetworkButton(page)).toBeFocused();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask was not found',
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toHaveCount(0);
+});
+
+test('retries a rejected add-network request', async ({ page }) => {
+  const submissions = await fixture(page, { rejectAddChainOnce: true });
+  await page.goto('/');
+  await addNetworkButton(page).click();
+  const failed = page.getByRole('alert', { name: 'Add Stable Testnet' });
+  await expect(failed).toContainText('rejected in MetaMask');
+  await failed.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  expect((await walletRequests(page)).map((request) => request.method)).toEqual([
+    'wallet_addEthereumChain',
+    'wallet_addEthereumChain',
+  ]);
+  expect(submissions).toHaveLength(0);
+});
+
+test('shows the available balance above the network status and clears it on disconnect', async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto('/');
+  const wallet = page.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toContainText('✓ Token network verified');
+  await expect(wallet).not.toContainText('USDT0 available');
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  const balance = wallet.locator('.owner-balance');
+  await expect(balance).toHaveText('1 USDT0 available');
+  const status = wallet.getByText('✓ Token network verified', { exact: true });
+  const balanceBox = (await balance.boundingBox())!;
+  const statusBox = (await status.boundingBox())!;
+  expect(balanceBox.y + balanceBox.height).toBeLessThanOrEqual(statusBox.y);
+  const fontSize = (element: HTMLElement) => parseFloat(getComputedStyle(element).fontSize);
+  expect(await wallet.locator('.balance-amount').evaluate(fontSize)).toBeGreaterThan(
+    await status.evaluate(fontSize),
+  );
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(wallet).not.toContainText('USDT0 available');
+  await expect(wallet).toContainText('Not connected');
+  // Reconnect as another account while its balance read is held: the old balance must not return.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(`${rpcUrl}/`, async (route) => {
+    if (route.request().postData()?.includes('70a08231')) await held;
+    await route.fallback();
+  });
+  await page.evaluate((next) => (window as any).walletTestSwitch(next), other);
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(wallet).toContainText(other);
+  await expect(balance).toHaveText('Checking balance…');
+  release();
+  await expect(balance).toHaveText('0.000007 USDT0 available');
+});
+
+test('shows a zero owner balance instead of hiding it', async ({ page }) => {
+  await fixture(page, { ownerTokenBalance: 0n });
+  await connect(page);
+  await expect(
+    page.getByRole('region', { name: 'Wallet owner' }).locator('.owner-balance'),
+  ).toHaveText('0 USDT0 available');
+});
+
+test('keeps wallet status in view beside the walkthrough and moves the CLI and explorer to the sidebar', async ({
+  page,
+}) => {
+  await fixture(page);
+  await connect(page);
+  const sidebar = page.getByRole('complementary', { name: 'Wallet and resources' });
+  const wallet = sidebar.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toBeVisible();
+  await expect(sidebar.getByRole('list', { name: 'Demo progress' })).toBeVisible();
+  const links = sidebar.getByRole('list', { name: 'Agent and explorer' }).getByRole('link');
+  await expect(links).toHaveText([/^Agent skill/, /^StableScan Testnet/]);
+  await expect(links.nth(1)).toHaveAttribute('href', 'https://testnet.stablescan.xyz');
+  const cli = sidebar.getByRole('region', { name: 'CLI', exact: true });
+  await expect(cli).toContainText('npm install --global @stablechain/agent-wallet-cli@0.2.1');
+  await expect(cli).toContainText('agent-wallet pay --payment-id PAYMENT_ID --json');
+  await expect(cli).toContainText('Recover uncertain payments with the same ID');
+  await expect(page.locator('.main-column').getByRole('region', { name: 'CLI' })).toHaveCount(0);
+  // Status messages lengthen the sidebar; the wallet must still sit below the header at the end.
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(sidebar.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  const transaction = sidebar.getByRole('link', { name: /^0x[0-9a-f]{64}/ });
+  await expect(transaction).toBeVisible();
+  await expect(transaction).toHaveAttribute(
+    'href',
+    `https://testnet.stablescan.xyz/tx/${keccak256(toHex(1))}`,
+  );
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(page.locator('#step-5')).toBeInViewport();
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(400);
+  await expect(wallet).toBeInViewport({ ratio: 1 });
+  const headerBottom = (await page.getByRole('banner').boundingBox())!;
+  expect((await wallet.boundingBox())!.y).toBeGreaterThanOrEqual(
+    headerBottom.y + headerBottom.height - 1,
+  );
+  await expect(wallet).toContainText('USDT0 available');
+  await cli.locator('summary').click();
+  await expect(cli.locator('pre')).toBeVisible();
+  // Opening the CLI scrolls it into view inside the sidebar, below the pinned wallet card.
+  await expect(cli.locator('pre')).toBeInViewport({ ratio: 1 });
+  await expect(cli.getByRole('link', { name: /CLI reference/ })).toBeInViewport();
+  await expect(wallet).toBeInViewport({ ratio: 1 });
+  const walletBottom = (await wallet.boundingBox())!;
+  expect((await cli.locator('pre').boundingBox())!.y).toBeGreaterThanOrEqual(
+    walletBottom.y + walletBottom.height - 1,
+  );
+  await expect(cli.getByRole('link', { name: /CLI reference/ })).toHaveAttribute(
+    'href',
+    'https://www.npmjs.com/package/@stablechain/agent-wallet-cli/v/0.2.1',
+  );
+});
+
+test('keeps setup links reachable on desktop and phone before connecting', async ({ page }) => {
+  await fixture(page);
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const header = page.getByRole('banner');
+    await expect(header.getByRole('link', { name: 'Stable', exact: true })).toHaveAttribute(
+      'href',
+      'https://stable.xyz/',
+    );
+    await expect(header.getByRole('img', { name: 'Stable' })).toBeVisible();
+    const github = header.getByRole('link', { name: 'GitHub' });
+    const docs = header.getByRole('link', { name: 'Docs' });
+    await expect(github).toBeVisible();
+    await expect(github).toHaveAttribute('href', 'https://github.com/stablelabs/agentic.stable.xyz');
+    await expect(docs).toBeVisible();
+    await expect(docs).toHaveAttribute('href', 'https://docs.stable.xyz/');
+    await expect(addNetworkButton(page)).toBeVisible();
+    const faucet = page.getByRole('link', { name: 'Get test USDT0' });
+    await expect(faucet).toBeVisible();
+    await expect(faucet).toHaveAttribute('href', 'https://faucet.stable.xyz/');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
+
+test('fits wallet status, the CLI and long addresses on a phone', async ({ page }, testInfo) => {
+  await fixture(page, { account: other });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await connect(page);
+  const wallet = page.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toContainText(other);
+  await expect(wallet.locator('.owner-balance')).toHaveText('1 USDT0 available');
+  const cli = page.getByRole('region', { name: 'CLI', exact: true });
+  await cli.locator('summary').click();
+  await expect(cli.locator('pre')).toBeVisible();
+  const top = async (selector: string) => (await page.locator(selector).boundingBox())!.y;
+  // Phone reading order follows the source: intro, wallet, step links, resources and CLI, steps.
+  expect(await top('.intro')).toBeLessThan(await top('.wallet-card'));
+  expect(await top('.wallet-card')).toBeLessThan(await top('.journey'));
+  expect(await top('.journey')).toBeLessThan(await top('.cli-panel'));
+  expect(await top('.cli-panel')).toBeLessThan(await top('#step-1'));
+  // Source order matches that visual order, so keyboard and screen-reader order do too.
+  expect(
+    await page.evaluate(() => {
+      const order = ['.intro', '.wallet-card', '.journey', '.cli-panel', 'main', '.site-footer'];
+      const nodes = order.map((selector) => document.querySelector(selector)!);
+      return nodes.every(
+        (node, index) =>
+          index === 0 ||
+          !!(nodes[index - 1].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+    }),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.address, pre, .cli-line, .step-card, .step-body, .wallet-card')]
+        .filter((element) => element.scrollWidth > element.clientWidth + 1)
+        .map((element) => element.className),
+    ),
+  ).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('phone-wallet-cli.png'), fullPage: true });
+});
+
+test('adds Stable Testnet through the EIP-6963 MetaMask provider', async ({ page }) => {
+  const submissions = await fixture(page, { discovery: true, unknownChain: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  const requests = await walletRequests(page);
+  expect(requests.map((request) => request.method)).toEqual(['wallet_addEthereumChain']);
+  expect(requests[0].params![0]).toEqual(stableTestnetParams);
+  expect(submissions).toHaveLength(0);
+});
+
+test('a repeated click joins the open add-network request', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).dblclick();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  expect((await walletRequests(page)).map((request) => request.method)).toEqual([
+    'wallet_addEthereumChain',
+  ]);
+});
+
+test('clears a failed add-network message once MetaMask connects', async ({ page }) => {
+  await fixture(page, { rejectAddChainOnce: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toBeVisible();
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toHaveCount(0);
+});
+
+test('shows a solid focus ring on keyboard focus', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await page.keyboard.press('Tab');
+  for (const target of [
+    addNetworkButton(page),
+    page.getByRole('button', { name: 'Connect MetaMask', exact: true }),
+    page.getByRole('link', { name: 'Get test USDT0' }),
+    page.getByRole('button', { name: /^Connect wallet/ }),
+    page.getByRole('button', { name: 'Show all steps', exact: true }),
+  ]) {
+    await target.focus();
+    const outline = await target.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test('exposes banner, main, complementary and contentinfo landmarks', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('banner')).toHaveCount(1);
+  await expect(page.getByRole('contentinfo')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Wallet and resources' })).toHaveCount(1);
+  const main = page.getByRole('main');
+  await expect(main).toHaveCount(1);
+  await expect(main.getByRole('list', { name: 'Demo progress' })).toHaveCount(0);
+  await expect(main.locator('#step-1')).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 1, name: 'Agent payments' })).toBeVisible();
+});
+
+test('keeps focused sidebar content clear of the pinned wallet card', async ({ page }) => {
+  await fixture(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await connect(page);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  const sidebar = page.getByRole('complementary', { name: 'Wallet and resources' });
+  await sidebar.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  const transaction = sidebar.getByRole('link', { name: /^0x[0-9a-f]{64}/ });
+  await transaction.focus();
+  await expect(transaction).toBeFocused();
+  expect(
+    await transaction.evaluate((element) => {
+      // The hash wraps, so probe the middle of its first line box.
+      const line = element.getClientRects()[0];
+      const hit = document.elementFromPoint(line.left + line.width / 2, line.top + line.height / 2);
+      return !!hit && element.contains(hit);
+    }),
+  ).toBe(true);
+  await expect(sidebar.getByRole('region', { name: 'Wallet owner' })).toBeInViewport({ ratio: 1 });
 });
