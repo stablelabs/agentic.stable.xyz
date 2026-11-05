@@ -117,6 +117,23 @@ const CLI_COMMANDS = [
   'agent-wallet payments prepare --recipient RECIPIENT_ADDRESS --amount 0.001 --json',
   'agent-wallet pay --payment-id PAYMENT_ID --json',
 ];
+// Set only by the Disconnect button, so a reload or a new tab does not silently reconnect.
+const DISCONNECTED_KEY = 'agentic-stable-demo:disconnected';
+function rememberDisconnected(value: boolean) {
+  try {
+    if (value) localStorage.setItem(DISCONNECTED_KEY, '1');
+    else localStorage.removeItem(DISCONNECTED_KEY);
+  } catch {
+    /* Storage blocked: the visitor can still connect manually. */
+  }
+}
+function wasDisconnected() {
+  try {
+    return localStorage.getItem(DISCONNECTED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 const formatBalance = (value: bigint) =>
   new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatAmount(value)));
 type NetworkRequest =
@@ -141,6 +158,7 @@ export default function App() {
   const [gasBalance, setGasBalance] = useState<bigint>();
   const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState('');
   const [networkError, setNetworkError] = useState('');
   const [notice, setNotice] = useState('');
@@ -394,30 +412,44 @@ Tell me if your storage might not persist between sessions. Stop before making a
       },
     });
   }
-  async function connect() {
+  // silent: restore a connection MetaMask already allows for this site (a reload, or an agent's
+  // approval link opened in a new tab). No prompt, no network switch, no error if it can't.
+  async function connect({ silent = false }: { silent?: boolean } = {}) {
     if (!config) return;
     disconnect();
     setBusy(true);
+    setRestoring(silent);
     try {
+      // Let an open Add Stable Testnet request finish first, so MetaMask shows one prompt at a time.
+      await addNetworkInFlight.current?.catch(() => undefined);
       const p = await metaMask();
-      setProvider(p);
-      const accounts = await p.request({ method: 'eth_requestAccounts' });
-      if (!accounts[0])
+      if (!silent) setProvider(p);
+      const accounts = silent
+        ? await p.request({ method: 'eth_accounts' })
+        : await p.request({ method: 'eth_requestAccounts' });
+      if (!accounts[0]) {
+        if (silent) return;
         throw new Error('No account was shared. Unlock MetaMask and select an account to connect.');
+      }
       const selected = address(accounts[0], 'wallet account');
       const selectedConfig = validateConfig({ ...config, alice: selected });
-      try {
-        await p.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: STABLE_TESTNET_HEX }],
-        });
-      } catch (e) {
-        if ((e as { code?: number }).code !== 4902) throw e;
-        await addStableTestnet(p, config.rpcUrl);
-        await p.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: STABLE_TESTNET_HEX }],
-        });
+      if (silent) {
+        // Switching networks needs the visitor's click.
+        if (Number(await p.request({ method: 'eth_chainId' })) !== CHAIN_ID) return;
+      } else {
+        try {
+          await p.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: STABLE_TESTNET_HEX }],
+          });
+        } catch (e) {
+          if ((e as { code?: number }).code !== 4902) throw e;
+          await addNetworkOnce(() => p, config.rpcUrl);
+          await p.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: STABLE_TESTNET_HEX }],
+          });
+        }
       }
       if (Number(await p.request({ method: 'eth_chainId' })) !== CHAIN_ID)
         throw new Error('Select Stable Testnet.');
@@ -433,6 +465,8 @@ Tell me if your storage might not persist between sessions. Stop before making a
         throw new Error(
           'Wallet account or network changed while connecting. Connect MetaMask again.',
         );
+      if (silent) setProvider(p);
+      else rememberDisconnected(false);
       activeOwner.current = selected.toLowerCase();
       setConfig(selectedConfig);
       setAccount(selected);
@@ -441,23 +475,37 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setNetworkRequest((request) => (request.state === 'failed' ? { state: 'idle' } : request));
     } catch (e) {
       disconnect();
-      setError(failure(e));
+      if (!silent) setError(failure(e));
     } finally {
       setBusy(false);
+      setRestoring(false);
     }
+  }
+  // Restore the wallet once settings load, unless the visitor chose Disconnect.
+  const restoreAttempted = useRef(false);
+  useEffect(() => {
+    if (!config || restoreAttempted.current) return;
+    restoreAttempted.current = true;
+    if (!wasDisconnected()) void connect({ silent: true });
+  }, [config]);
+  // One add-network request at a time, shared by the header action and connect().
+  function addNetworkOnce(provider: () => Provider | Promise<Provider>, rpcUrl?: string) {
+    addNetworkInFlight.current ??= Promise.resolve()
+      .then(provider)
+      .then((wallet) => addStableTestnet(wallet, rpcUrl))
+      .finally(() => {
+        addNetworkInFlight.current = undefined;
+      });
+    return addNetworkInFlight.current;
   }
   // Adds the network only: no account access, no chain switch request, no transaction.
   // Repeated clicks join the request MetaMask is already showing instead of opening another.
   async function addNetwork() {
+    if (busy) return;
     const requestId = ++networkRequestId.current;
     setNetworkRequest({ state: 'pending', message: 'Confirm Stable Testnet in MetaMask.' });
     try {
-      addNetworkInFlight.current ??= metaMask()
-        .then((provider) => addStableTestnet(provider, config?.rpcUrl))
-        .finally(() => {
-          addNetworkInFlight.current = undefined;
-        });
-      await addNetworkInFlight.current;
+      await addNetworkOnce(metaMask, config?.rpcUrl);
       if (requestId === networkRequestId.current)
         setNetworkRequest({
           state: 'added',
@@ -601,6 +649,39 @@ Tell me if your storage might not persist between sessions. Stop before making a
       setBusy(false);
     }
   }
+  // Moves to the wallet messages in the sidebar and focuses the first control there.
+  function showWalletMessages() {
+    const panel = document.getElementById('wallet-messages');
+    if (!panel) return;
+    panel.scrollIntoView({ block: 'nearest' });
+    (
+      panel.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)') ?? panel
+    ).focus({ preventScroll: true });
+  }
+  // The wallet steps repeat the latest wallet message, so a blocked form always says why.
+  const walletMessage = storageError || error || networkError;
+  const stepStatus =
+    connected && (pending || walletMessage || notice) ? (
+      <div
+        className={pending || walletMessage ? 'step-status attention' : 'step-status'}
+      >
+        {pending && (
+          <p>
+            <strong>
+              {operation!.action === 'fund' ? 'Gas transfer' : 'Token approval'} unverified.
+            </strong>{' '}
+            New wallet submissions are blocked until it is confirmed.
+          </p>
+        )}
+        {walletMessage && <p className="step-status-error">{walletMessage}</p>}
+        {notice && !pending && <p>{notice}</p>}
+        {(pending || walletMessage) && (
+          <Button type="button" variant="link" onClick={showWalletMessages}>
+            {pending ? 'Resolve unverified transaction' : 'View details'}
+          </Button>
+        )}
+      </div>
+    ) : null;
   const walletStatus = connected
     ? verified
       ? '✓ Token network verified'
@@ -626,6 +707,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
           <Button
             ref={networkButton}
             variant="outline"
+            disabled={busy}
             className="network-button"
             aria-describedby="network-button-help"
             onClick={() => void addNetwork()}
@@ -698,17 +780,30 @@ Tell me if your storage might not persist between sessions. Stop before making a
             <div className="actions wallet-actions">
               <Button disabled={busy || !config || connected} onClick={() => void connect()}>
                 <Wallet size={16} aria-hidden="true" />
-                {connected ? 'Owner connected' : busy ? 'Connecting…' : 'Connect MetaMask'}
+                {connected
+                  ? 'Owner connected'
+                  : busy
+                    ? restoring
+                      ? 'Checking MetaMask…'
+                      : 'Connecting…'
+                    : 'Connect MetaMask'}
               </Button>
               {account && (
-                <Button variant="ghost" disabled={busy} onClick={disconnect}>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    rememberDisconnected(true);
+                    disconnect();
+                  }}
+                >
                   Disconnect
                 </Button>
               )}
             </div>
           </Card>
           {(storageError || error || networkError || notice || operation?.hash || pending) && (
-            <div className="sidebar-messages">
+            <div className="sidebar-messages" id="wallet-messages" tabIndex={-1}>
               {(storageError || error || networkError) && (
                 <Alert variant="destructive" className="message error">
                   <AlertDescription>
@@ -1105,6 +1200,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     {refreshing ? 'Refreshing…' : 'Refresh'}
                   </Button>
                 </div>
+                {stepStatus}
                 <p className="form-note">
                   {!connected
                     ? 'Connect MetaMask.'
@@ -1167,6 +1263,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
                 >
                   Fund agent gas
                 </Button>
+                {stepStatus}
               </form>
             </Step>
             <Step
@@ -1229,6 +1326,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
             <button
               type="button"
               className="toast-action"
+              disabled={busy}
               onClick={() => {
                 returnFocusFromToast();
                 void addNetwork();

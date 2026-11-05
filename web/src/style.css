@@ -635,6 +635,31 @@ h1 {
 .message label {
   margin-top: 8px;
 }
+.sidebar-messages:focus-visible {
+  outline-offset: -2px;
+}
+.step-status {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--ink-10);
+  background: var(--ink-05);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-80);
+  overflow-wrap: anywhere;
+}
+.step-status p {
+  margin: 0;
+}
+.step-status p + p {
+  margin-top: 6px;
+}
+.step-status .step-status-error {
+  color: var(--danger);
+}
+.step-status [data-slot='button'] {
+  margin-top: 6px;
+}
 .transaction {
   font-family: var(--font-code);
   font-size: 12px;
