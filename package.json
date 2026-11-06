@@ -24,8 +24,9 @@
     "verify:published-cli": "node scripts/verify-published-cli.mjs"
   },
   "dependencies": {
-    "@fontsource/atkinson-hyperlegible": "^5.3.0",
-    "@fontsource/libre-baskerville": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/work-sans": "^5.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.62.0",

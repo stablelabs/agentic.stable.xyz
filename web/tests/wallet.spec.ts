@@ -15,6 +15,13 @@ const agent = '0x2222222222222222222222222222222222222222';
 const other = '0x3333333333333333333333333333333333333333';
 const rpcUrl = 'https://rpc.agent-wallet.invalid';
 const blockHash = keccak256('0x03');
+const stableTestnetParams = {
+  chainId: '0x899',
+  chainName: 'Stable Testnet',
+  nativeCurrency: { name: 'USDT0', symbol: 'USDT0', decimals: 18 },
+  rpcUrls: [rpcUrl],
+  blockExplorerUrls: ['https://testnet.stablescan.xyz'],
+};
 const config = {
   schemaVersion: 2,
   chainId: 2201,
@@ -60,10 +67,14 @@ async function fixture(
     emptyAccounts?: boolean;
     unknownChain?: boolean;
     rejectSwitch?: boolean;
+    rejectAddChainOnce?: boolean;
+    deferAddChain?: boolean;
+    authorized?: boolean;
+    ownerTokenBalance?: bigint;
   } = {},
 ) {
   const walletOwner = options.account || alice;
-  const { allowance: initialAllowance, ...walletOptions } = options;
+  const { allowance: initialAllowance, ownerTokenBalance, ...walletOptions } = options;
   const allowances = new Map([[walletOwner, initialAllowance ?? 0n]]);
   let gas = 0n;
   const submissions: Tx[] = [];
@@ -133,7 +144,11 @@ async function fixture(
         const values: any = {
           decimals: 6,
           symbol: 'USDT0',
-          balanceOf: 1_000_000n,
+          balanceOf:
+            decoded.functionName === 'balanceOf' &&
+            decoded.args[0].toLowerCase() === walletOwner.toLowerCase()
+              ? (ownerTokenBalance ?? 1_000_000n)
+              : 7n,
           allowance:
             decoded.functionName === 'allowance'
               ? (allowances.get(decoded.args[0].toLowerCase()) ?? 0n)
@@ -199,6 +214,9 @@ async function fixture(
       const listeners: Record<string, (() => void)[]> = {};
       let chainId = options.unknownChain ? '0x1' : '0x899';
       let added = !options.unknownChain;
+      let addRejections = options.rejectAddChainOnce ? 1 : 0;
+      // Like MetaMask, eth_accounts is empty until this site has been granted an account.
+      let authorized = !!options.authorized;
       (window as any).walletTestRequests = [];
       const provider = {
         isMetaMask: true,
@@ -206,8 +224,12 @@ async function fixture(
           (window as any).walletTestRequests.push({ method, params });
           if (method === 'eth_requestAccounts' && options.rejectConnect)
             throw Object.assign(new Error('Connection rejected'), { code: 4001 });
-          if (method === 'eth_requestAccounts' || method === 'eth_accounts')
-            return options.emptyAccounts ? [] : [account];
+          if (method === 'eth_requestAccounts') {
+            if (options.emptyAccounts) return [];
+            authorized = true;
+            return [account];
+          }
+          if (method === 'eth_accounts') return options.emptyAccounts || !authorized ? [] : [account];
           if (method === 'eth_chainId') return chainId;
           if (method === 'wallet_switchEthereumChain') {
             if (options.rejectSwitch)
@@ -218,6 +240,13 @@ async function fixture(
             return null;
           }
           if (method === 'wallet_addEthereumChain') {
+            if (addRejections > 0) {
+              addRejections--;
+              throw Object.assign(new Error('User rejected the request.'), { code: 4001 });
+            }
+            // Hold the wallet response until the test confirms it, like an open MetaMask prompt.
+            if (options.deferAddChain)
+              await new Promise((resolve) => ((window as any).walletTestResolveAdd = resolve));
             added = true;
             return null;
           }
@@ -465,13 +494,8 @@ test('adds Stable Testnet and switches before enabling wallet actions', async ({
   await fixture(page, { unknownChain: true });
   await connect(page);
   const requests = await page.evaluate(() => (window as any).walletTestRequests);
-  expect(requests.find((r: any) => r.method === 'wallet_addEthereumChain').params[0]).toMatchObject(
-    {
-      chainId: '0x899',
-      chainName: 'Stable Testnet',
-      rpcUrls: [rpcUrl],
-      nativeCurrency: { symbol: 'USDT0', decimals: 18 },
-    },
+  expect(requests.find((r: any) => r.method === 'wallet_addEthereumChain').params[0]).toEqual(
+    stableTestnetParams,
   );
   await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
 });
@@ -633,6 +657,7 @@ test('copies an exact payment request after approval and gas funding without sen
   await connect(page);
   const payment = page.getByRole('region', { name: 'Send payment', exact: true });
   const recipient = '0x4444444444444444444444444444444444444444';
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await page.getByLabel('Recipient address', { exact: true }).fill(recipient);
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
   await expect(copy).toBeDisabled();
@@ -689,6 +714,7 @@ test('validates payment terms and provides manual copying if clipboard access is
   const recipient = page.getByLabel('Recipient address', { exact: true });
   const amount = page.getByLabel('Payment amount (USDT0)');
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await recipient.fill('0x0000000000000000000000000000000000000000');
   await expect(copy).toBeDisabled();
   await expect(recipient).toHaveAttribute('aria-invalid', 'true');
@@ -760,6 +786,9 @@ test('an RPC outage retains wallet identity while blocking spending until checks
   await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText(
     'network checks unavailable',
   );
+  await expect(
+    page.getByRole('region', { name: 'Wallet owner' }).locator('.owner-balance'),
+  ).toHaveText('Balance unavailable');
   await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Fund agent gas', exact: true })).toBeDisabled();
   expect(submissions).toHaveLength(0);
@@ -782,7 +811,8 @@ test('highlights the selected step independently of wallet progress', async ({ p
     await expect(current).toHaveCount(1);
     await expect(link).toHaveAttribute('aria-current', 'step');
     await expect(page.locator('#step-' + number)).toHaveAttribute('data-state', 'open');
-    await expect(page.locator('.walkthrough-heading')).toContainText(`Step ${number} of 5`);
+    // The numbered links and open card mark the step; there is no separate step counter.
+    await expect(page.getByText(/Step \d of 5/)).toHaveCount(0);
   }
   // Opening a card directly also selects it; expanding all cards preserves that selection.
   await page
@@ -824,6 +854,9 @@ test('guides a new visitor through five steps and ends with an honest payment ha
     'step',
   );
   await page.getByLabel('Allowance amount (USDT0)').fill('0.01');
+  // The existing-signer fields start folded for a new visitor.
+  await expect(page.getByLabel('Agent signer', { exact: true })).toBeHidden();
+  await page.getByText('Already have a signer?', { exact: true }).click();
   await page.getByLabel('Agent signer', { exact: true }).fill(agent);
   await expect(page.locator('#step-3')).toHaveAttribute('data-state', 'open');
   await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
@@ -834,6 +867,12 @@ test('guides a new visitor through five steps and ends with an honest payment ha
     'aria-current',
     'step',
   );
+  // Asking the agent in chat is the main path; the full prompt builder is folded.
+  const step5 = page.getByRole('region', { name: 'Send payment', exact: true });
+  await expect(step5.locator('.ask-agent code')).toHaveText('Send 0.01 USDT0 to 0x…');
+  await expect(step5).toContainText('It can spend up to');
+  await expect(page.getByLabel('Recipient address', { exact: true })).toBeHidden();
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await page.getByLabel('Recipient address', { exact: true }).fill(other);
   await page.getByRole('button', { name: 'Copy payment prompt', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Submit via agent' })).toBeVisible();
@@ -848,4 +887,704 @@ test('guides a new visitor through five steps and ends with an honest payment ha
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('freeze-mobile-handoff.png'), fullPage: true });
+});
+
+const walletRequests = (page: Page) =>
+  page.evaluate(
+    () => (window as any).walletTestRequests as { method: string; params?: any[] }[],
+  );
+// Wallet calls that open a MetaMask prompt; read-only calls such as eth_accounts are left out.
+const promptingMethods = [
+  'eth_requestAccounts',
+  'wallet_switchEthereumChain',
+  'wallet_addEthereumChain',
+  'eth_sendTransaction',
+];
+const walletPrompts = async (page: Page) =>
+  (await walletRequests(page))
+    .map((request) => request.method)
+    .filter((method) => promptingMethods.includes(method));
+const addNetworkButton = (page: Page) =>
+  page.getByRole('button', { name: 'Add Stable Testnet to wallet', exact: true });
+
+test('adds Stable Testnet from the header before connecting, without account access or transactions', async ({
+  page,
+}) => {
+  const submissions = await fixture(page, { unknownChain: true });
+  await page.goto('/');
+  await expect(page.getByText('Stable Testnet · 2201')).toHaveCount(0);
+  // Settings have loaded once Connect is enabled, so the request uses the configured RPC.
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await expect(addNetworkButton(page)).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet (chain 2201).',
+  );
+  expect(await walletPrompts(page)).toEqual(['wallet_addEthereumChain']);
+  const requests = await walletRequests(page);
+  expect(requests.find((request) => request.method === 'wallet_addEthereumChain')!.params![0]).toEqual(
+    stableTestnetParams,
+  );
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText('Not connected');
+  // The existing connect, switch and verify flow still runs afterwards.
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  const methods = (await walletRequests(page)).map((request) => request.method);
+  expect(methods.filter((method) => method === 'wallet_addEthereumChain')).toHaveLength(1);
+  expect(methods).toContain('wallet_switchEthereumChain');
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+  expect(submissions).toHaveLength(0);
+});
+
+test('shows missing MetaMask when adding the network and keeps the action retryable', async ({
+  page,
+}) => {
+  await fixture(page, { missingWallet: true });
+  await page.goto('/');
+  await addNetworkButton(page).click();
+  const failed = page.getByRole('alert', { name: 'Add Stable Testnet' });
+  await expect(failed).toContainText('MetaMask was not found');
+  await expect(failed.getByRole('button', { name: 'Try again' })).toBeEnabled();
+  await expect(addNetworkButton(page)).toBeEnabled();
+  await failed.getByRole('button', { name: 'Dismiss' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(failed).toHaveCount(0);
+  await expect(addNetworkButton(page)).toBeFocused();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask was not found',
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toHaveCount(0);
+});
+
+test('retries a rejected add-network request', async ({ page }) => {
+  const submissions = await fixture(page, { rejectAddChainOnce: true });
+  await page.goto('/');
+  await addNetworkButton(page).click();
+  const failed = page.getByRole('alert', { name: 'Add Stable Testnet' });
+  await expect(failed).toContainText('rejected in MetaMask');
+  await failed.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  expect(await walletPrompts(page)).toEqual(['wallet_addEthereumChain', 'wallet_addEthereumChain']);
+  expect(submissions).toHaveLength(0);
+});
+
+test('shows the available balance above the network status and clears it on disconnect', async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto('/');
+  const wallet = page.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toContainText('✓ Token network verified');
+  await expect(wallet).not.toContainText('USDT0 available');
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  const balance = wallet.locator('.owner-balance');
+  await expect(balance).toHaveText('1 USDT0 available');
+  const status = wallet.getByText('✓ Token network verified', { exact: true });
+  const balanceBox = (await balance.boundingBox())!;
+  const statusBox = (await status.boundingBox())!;
+  expect(balanceBox.y + balanceBox.height).toBeLessThanOrEqual(statusBox.y);
+  const fontSize = (element: HTMLElement) => parseFloat(getComputedStyle(element).fontSize);
+  expect(await wallet.locator('.balance-amount').evaluate(fontSize)).toBeGreaterThan(
+    await status.evaluate(fontSize),
+  );
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(wallet).not.toContainText('USDT0 available');
+  await expect(wallet).toContainText('Not connected');
+  // Reconnect as another account while its balance read is held: the old balance must not return.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(`${rpcUrl}/`, async (route) => {
+    if (route.request().postData()?.includes('70a08231')) await held;
+    await route.fallback();
+  });
+  await page.evaluate((next) => (window as any).walletTestSwitch(next), other);
+  await page.getByRole('button', { name: 'Connect MetaMask' }).click();
+  await expect(wallet).toContainText(other);
+  await expect(balance).toHaveText('Checking balance…');
+  release();
+  await expect(balance).toHaveText('0.000007 USDT0 available');
+});
+
+test('shows a zero owner balance instead of hiding it', async ({ page }) => {
+  await fixture(page, { ownerTokenBalance: 0n });
+  await connect(page);
+  await expect(
+    page.getByRole('region', { name: 'Wallet owner' }).locator('.owner-balance'),
+  ).toHaveText('0 USDT0 available');
+});
+
+test('keeps wallet status in view beside the walkthrough and moves the CLI and explorer to the sidebar', async ({
+  page,
+}) => {
+  await fixture(page);
+  await connect(page);
+  const sidebar = page.getByRole('complementary', { name: 'Wallet and resources' });
+  const wallet = sidebar.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toBeVisible();
+  await expect(sidebar.getByRole('list', { name: 'Demo progress' })).toBeVisible();
+  const links = sidebar.getByRole('list', { name: 'Agent and explorer' }).getByRole('link');
+  await expect(links).toHaveText([/^Agent skill/, /^StableScan Testnet/]);
+  await expect(links.nth(1)).toHaveAttribute('href', 'https://testnet.stablescan.xyz');
+  const cli = sidebar.getByRole('region', { name: 'CLI', exact: true });
+  await expect(cli).toContainText('npm install --global @stablechain/agent-wallet-cli@0.2.1');
+  await expect(cli).toContainText('agent-wallet pay --payment-id PAYMENT_ID --json');
+  await expect(cli).toContainText('Recover uncertain payments with the same ID');
+  await expect(page.locator('.main-column').getByRole('region', { name: 'CLI' })).toHaveCount(0);
+  // Status messages lengthen the sidebar; the wallet must still sit below the header at the end.
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(sidebar.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  const transaction = sidebar.getByRole('link', { name: /^0x[0-9a-f]{64}/ });
+  await expect(transaction).toBeVisible();
+  await expect(transaction).toHaveAttribute(
+    'href',
+    `https://testnet.stablescan.xyz/tx/${keccak256(toHex(1))}`,
+  );
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(page.locator('#step-5')).toBeInViewport();
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(400);
+  await expect(wallet).toBeInViewport({ ratio: 1 });
+  const headerBottom = (await page.getByRole('banner').boundingBox())!;
+  expect((await wallet.boundingBox())!.y).toBeGreaterThanOrEqual(
+    headerBottom.y + headerBottom.height - 1,
+  );
+  await expect(wallet).toContainText('USDT0 available');
+  await cli.locator('summary').click();
+  await expect(cli.locator('pre')).toBeVisible();
+  // Opening the CLI scrolls it into view inside the sidebar, below the pinned wallet card.
+  await expect(cli.locator('pre')).toBeInViewport({ ratio: 1 });
+  await expect(cli.getByRole('link', { name: /CLI reference/ })).toBeInViewport();
+  await expect(wallet).toBeInViewport({ ratio: 1 });
+  const walletBottom = (await wallet.boundingBox())!;
+  expect((await cli.locator('pre').boundingBox())!.y).toBeGreaterThanOrEqual(
+    walletBottom.y + walletBottom.height - 1,
+  );
+  await expect(cli.getByRole('link', { name: /CLI reference/ })).toHaveAttribute(
+    'href',
+    'https://www.npmjs.com/package/@stablechain/agent-wallet-cli/v/0.2.1',
+  );
+});
+
+test('keeps setup links reachable on desktop and phone before connecting', async ({ page }) => {
+  await fixture(page);
+  for (const viewport of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const header = page.getByRole('banner');
+    await expect(header.getByRole('link', { name: 'Stable', exact: true })).toHaveAttribute(
+      'href',
+      'https://stable.xyz/',
+    );
+    await expect(header.getByRole('img', { name: 'Stable' })).toBeVisible();
+    const github = header.getByRole('link', { name: 'GitHub' });
+    const docs = header.getByRole('link', { name: 'Docs' });
+    await expect(github).toBeVisible();
+    await expect(github).toHaveAttribute('href', 'https://github.com/stablelabs/agentic.stable.xyz');
+    await expect(docs).toBeVisible();
+    await expect(docs).toHaveAttribute('href', 'https://docs.stable.xyz/');
+    await expect(addNetworkButton(page)).toBeVisible();
+    const faucet = page.getByRole('link', { name: 'Get test USDT0' });
+    await expect(faucet).toBeVisible();
+    await expect(faucet).toHaveAttribute('href', 'https://faucet.stable.xyz/');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+});
+
+test('fits wallet status, the CLI and long addresses on a phone', async ({ page }, testInfo) => {
+  await fixture(page, { account: other });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await connect(page);
+  const wallet = page.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toContainText(other);
+  await expect(wallet.locator('.owner-balance')).toHaveText('1 USDT0 available');
+  const cli = page.getByRole('region', { name: 'CLI', exact: true });
+  await cli.locator('summary').click();
+  await expect(cli.locator('pre')).toBeVisible();
+  const top = async (selector: string) => (await page.locator(selector).boundingBox())!.y;
+  // Phone reading order follows the source: intro, wallet, step links, resources and CLI, steps.
+  expect(await top('.intro')).toBeLessThan(await top('.wallet-card'));
+  expect(await top('.wallet-card')).toBeLessThan(await top('.journey'));
+  expect(await top('.journey')).toBeLessThan(await top('.cli-panel'));
+  expect(await top('.cli-panel')).toBeLessThan(await top('#step-1'));
+  // Source order matches that visual order, so keyboard and screen-reader order do too.
+  expect(
+    await page.evaluate(() => {
+      const order = ['.intro', '.wallet-card', '.journey', '.cli-panel', 'main', '.site-footer'];
+      const nodes = order.map((selector) => document.querySelector(selector)!);
+      return nodes.every(
+        (node, index) =>
+          index === 0 ||
+          !!(nodes[index - 1].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+    }),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('.address, pre, .cli-line, .step-card, .step-body, .wallet-card')]
+        .filter((element) => element.scrollWidth > element.clientWidth + 1)
+        .map((element) => element.className),
+    ),
+  ).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('phone-wallet-cli.png'), fullPage: true });
+});
+
+test('adds Stable Testnet through the EIP-6963 MetaMask provider', async ({ page }) => {
+  const submissions = await fixture(page, { discovery: true, unknownChain: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  expect(await walletPrompts(page)).toEqual(['wallet_addEthereumChain']);
+  const requests = await walletRequests(page);
+  expect(requests.find((request) => request.method === 'wallet_addEthereumChain')!.params![0]).toEqual(
+    stableTestnetParams,
+  );
+  expect(submissions).toHaveLength(0);
+});
+
+test('a repeated click joins the open add-network request', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).dblclick();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  expect(await walletPrompts(page)).toEqual(['wallet_addEthereumChain']);
+});
+
+test('clears a failed add-network message once MetaMask connects', async ({ page }) => {
+  await fixture(page, { rejectAddChainOnce: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toBeVisible();
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  await expect(page.getByRole('alert', { name: 'Add Stable Testnet' })).toHaveCount(0);
+});
+
+test('shows a solid focus ring on keyboard focus', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+  await page.keyboard.press('Tab');
+  for (const target of [
+    addNetworkButton(page),
+    page.getByRole('button', { name: 'Connect MetaMask', exact: true }),
+    page.getByRole('link', { name: 'Get test USDT0' }),
+    page.getByRole('button', { name: /^Connect wallet/ }),
+    page.getByRole('button', { name: 'Show all steps', exact: true }),
+  ]) {
+    await target.focus();
+    const outline = await target.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test('exposes banner, main, complementary and contentinfo landmarks', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  await expect(page.getByRole('banner')).toHaveCount(1);
+  await expect(page.getByRole('contentinfo')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Wallet and resources' })).toHaveCount(1);
+  const main = page.getByRole('main');
+  await expect(main).toHaveCount(1);
+  await expect(main.getByRole('list', { name: 'Demo progress' })).toHaveCount(0);
+  await expect(main.locator('#step-1')).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 1, name: 'Agent payments' })).toBeVisible();
+});
+
+test('keeps focused sidebar content clear of the pinned wallet card', async ({ page }) => {
+  await fixture(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await connect(page);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Agent approval confirmed onchain');
+  const sidebar = page.getByRole('complementary', { name: 'Wallet and resources' });
+  await sidebar.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  const transaction = sidebar.getByRole('link', { name: /^0x[0-9a-f]{64}/ });
+  await transaction.focus();
+  await expect(transaction).toBeFocused();
+  expect(
+    await transaction.evaluate((element) => {
+      // The hash wraps, so probe the middle of its first line box.
+      const line = element.getClientRects()[0];
+      const hit = document.elementFromPoint(line.left + line.width / 2, line.top + line.height / 2);
+      return !!hit && element.contains(hit);
+    }),
+  ).toBe(true);
+  await expect(sidebar.getByRole('region', { name: 'Wallet owner' })).toBeInViewport({ ratio: 1 });
+});
+
+test('connect waits for an open add-network request instead of opening another prompt', async ({
+  page,
+}) => {
+  const submissions = await fixture(page, { unknownChain: true, deferAddChain: true });
+  await page.goto('/');
+  const connectButton = page.getByRole('button', { name: 'Connect MetaMask', exact: true });
+  await expect(connectButton).toBeEnabled();
+  await addNetworkButton(page).click();
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'Confirm Stable Testnet in MetaMask',
+  );
+  await expect.poll(() => walletPrompts(page)).toEqual(['wallet_addEthereumChain']);
+  await connectButton.click();
+  await expect(page.getByRole('button', { name: 'Connecting…', exact: true })).toBeDisabled();
+  await expect(addNetworkButton(page)).toBeDisabled();
+  // Longer than MetaMask discovery: Connect has still sent nothing while the add prompt is open.
+  await page.waitForTimeout(600);
+  expect(await walletPrompts(page)).toEqual(['wallet_addEthereumChain']);
+  await page.evaluate(() => (window as any).walletTestResolveAdd());
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  const methods = (await walletRequests(page)).map((request) => request.method);
+  expect(methods.filter((method) => method === 'wallet_addEthereumChain')).toHaveLength(1);
+  expect(methods.indexOf('eth_requestAccounts')).toBeGreaterThan(
+    methods.indexOf('wallet_addEthereumChain'),
+  );
+  await expect(page.getByRole('status', { name: 'Add Stable Testnet' })).toContainText(
+    'MetaMask accepted Stable Testnet',
+  );
+  await expect(addNetworkButton(page)).toBeEnabled();
+  expect(submissions).toHaveLength(0);
+});
+
+test('keeps an unverified transaction actionable from the active step on phone and desktop', async ({
+  page,
+}) => {
+  const submissions = await fixture(page, { unknown: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await connect(page);
+  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Pending operation' })).toBeAttached();
+  const inline = page.locator('#step-3 .step-status');
+  await expect(inline).toContainText('Token approval unverified.');
+  await expect(inline).toContainText('outcome is unknown');
+  await expect(inline).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeDisabled();
+  const hash = page.getByLabel('Transaction hash from MetaMask');
+  await inline.getByRole('button', { name: 'Resolve unverified transaction' }).click();
+  await expect(hash).toBeFocused();
+  await expect(hash).toBeInViewport({ ratio: 1 });
+  // Desktop: the opened CLI scrolls the sidebar away from the recovery form; the jump brings it back.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const cli = page.getByRole('region', { name: 'CLI', exact: true });
+  await cli.locator('summary').click();
+  await expect(cli.locator('pre')).toBeInViewport();
+  await inline.scrollIntoViewIfNeeded();
+  await inline.getByRole('button', { name: 'Resolve unverified transaction' }).click();
+  await expect(hash).toBeFocused();
+  await expect(hash).toBeInViewport({ ratio: 1 });
+  expect(
+    await hash.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return hit === element;
+    }),
+  ).toBe(true);
+  expect(submissions).toHaveLength(1);
+});
+
+
+test('an approval link in a new tab restores an authorized wallet and its progress without prompts', async ({
+  page,
+}) => {
+  const submissions = await fixture(page, { authorized: true, noDefaultAgent: true, allowance: 0n });
+  await page.goto(`/?agent=${agent}&amount=0.01`);
+  await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+  const wallet = page.getByRole('region', { name: 'Wallet owner' });
+  await expect(wallet).toContainText(alice);
+  await expect(wallet.locator('.owner-balance')).toHaveText('1 USDT0 available');
+  expect(await walletPrompts(page)).toEqual([]);
+  // Prefilled signer and amount, connect and signer steps checked, approval is the open step.
+  await expect(page.getByLabel('Agent signer', { exact: true })).toHaveValue(agent);
+  await expect(page.getByLabel('Allowance amount (USDT0)')).toHaveValue('0.01');
+  const progress = page.getByRole('list', { name: 'Demo progress' });
+  await expect(progress.locator('.nav-number svg')).toHaveCount(2);
+  await expect(progress.getByRole('link', { name: '3. Approve allowance' })).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
+  await expect(page.locator('#step-3')).toHaveAttribute('data-state', 'open');
+  await expect(page.getByRole('button', { name: 'Approve agent', exact: true })).toBeEnabled();
+  expect(submissions).toHaveLength(0);
+});
+
+test('restores progress past approval when the allowance is already set', async ({ page }) => {
+  await fixture(page, { authorized: true, allowance: 10_000n });
+  await page.goto(`/?agent=${agent}&amount=0.01`);
+  await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+  const progress = page.getByRole('list', { name: 'Demo progress' });
+  await expect(progress.locator('.nav-number svg')).toHaveCount(3);
+  await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
+});
+
+for (const scenario of [
+  { name: 'a site MetaMask has not authorized', options: {} },
+  { name: 'an authorized wallet on another network', options: { authorized: true, unknownChain: true } },
+]) {
+  test(`does not prompt, switch networks or show errors on load for ${scenario.name}`, async ({
+    page,
+  }) => {
+    await fixture(page, scenario.options);
+    await page.goto(`/?agent=${agent}&amount=0.01`);
+    await expect(page.getByRole('button', { name: 'Connect MetaMask', exact: true })).toBeEnabled();
+    await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText('Not connected');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await walletRequests(page)).map((request) => request.method)).toContain('eth_accounts');
+    expect(await walletPrompts(page)).toEqual([]);
+  });
+}
+
+test('stays disconnected after Disconnect until the visitor connects again', async ({ page }) => {
+  await fixture(page, { authorized: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await page.reload();
+  const connectButton = page.getByRole('button', { name: 'Connect MetaMask', exact: true });
+  await expect(connectButton).toBeEnabled();
+  await expect(page.getByRole('region', { name: 'Wallet owner' })).toContainText('Not connected');
+  await connectButton.click();
+  await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+});
+
+test('switches between dark and light themes and remembers the choice', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  const html = page.locator('html');
+  const logo = page.getByRole('banner').getByRole('img', { name: 'Stable' });
+  const background = () =>
+    page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  expect(await background()).toBe('rgb(0, 30, 30)');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-light.svg');
+  await page.getByRole('button', { name: 'Switch to light theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  expect(await background()).toBe('rgb(232, 251, 247)');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-dark.svg');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#e8fbf7');
+  // The saved theme is applied before the app renders, so a reload does not flash dark.
+  await page.reload({ waitUntil: 'commit' });
+  await page.waitForFunction(() => document.body !== null);
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-light.svg');
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`keeps text at 4.5:1 or better in the ${theme} theme`, async ({ page }) => {
+    await fixture(page, { noDefaultAgent: true });
+    await page.addInitScript(
+      (value) => localStorage.setItem('agentic-stable-demo:theme', value),
+      theme,
+    );
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+    await page.getByText('Already have a signer?', { exact: true }).click();
+    await page.getByLabel('Agent signer', { exact: true }).fill('0x2');
+    const ratios = await page.evaluate(() => {
+      const parse = (value: string) => {
+        const parts = value.match(/[\d.]+/g)!.map(Number);
+        return { rgb: parts.slice(0, 3), alpha: parts[3] ?? 1 };
+      };
+      const lum = ([r, g, b]: number[]) => {
+        const f = (c: number) => {
+          const v = c / 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const backgroundOf = (element: Element | null): number[] => {
+        for (let node = element; node; node = node.parentElement) {
+          const { rgb, alpha } = parse(getComputedStyle(node).backgroundColor);
+          if (alpha === 1 && getComputedStyle(node).backgroundImage === 'none') return rgb;
+        }
+        return parse(getComputedStyle(document.body).backgroundColor).rgb;
+      };
+      const ratio = (selector: string) => {
+        const element = document.querySelector(selector)!;
+        const ground = backgroundOf(element);
+        const { rgb, alpha } = parse(getComputedStyle(element).color);
+        const text = rgb.map((c, i) => alpha * c + (1 - alpha) * ground[i]);
+        const [a, b] = [lum(text), lum(ground)];
+        return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100;
+      };
+      return Object.fromEntries(
+        [
+          '.walkthrough-toolbar .eyebrow',
+          '.intro .lede',
+          '.intro-needs',
+          '.account-meta',
+          '.balance-unit',
+          '.step-summary',
+          '.form-note',
+          '#agent-help',
+          '.network-button',
+          '.site-footer p',
+          '.wallet-actions [data-variant="ghost"]',
+        ].map((selector) => [selector, ratio(selector)]),
+      );
+    });
+    for (const [selector, value] of Object.entries(ratios))
+      expect(value, `${selector} in ${theme}`).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test(`uses only Stable design system colours in the ${theme} theme`, async ({ page }) => {
+    await fixture(page, { noDefaultAgent: true });
+    await page.addInitScript(
+      (value) => localStorage.setItem('agentic-stable-demo:theme', value),
+      theme,
+    );
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+    // An invalid agent puts an error on screen, so error colours are checked too.
+    await page.getByText('Already have a signer?', { exact: true }).click();
+    await page.getByLabel('Agent signer', { exact: true }).fill('0x2');
+    await expect(page.locator('#agent-help.field-error')).toBeVisible();
+    await page.mouse.move(0, 0);
+    const offGuide = await page.evaluate(() => {
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        '<style>*, *::before, *::after { transition: none !important; }</style>',
+      );
+      // Solid colours from the design system's tokens.json.
+      const solids = [
+        '#001e1e', '#e8fbf7', '#84ff82', '#e1ffcd', '#6df5ff', '#ff8991', '#b4ff82',
+        '#9abbb4', '#b8fbf7', '#5c7f7a', '#001a1c', '#a7f9ff', '#0c1e00', '#1f1b00',
+        '#ffe96d', '#fff5bc', '#280003', '#ffd4d7', '#080020', '#a889ff', '#d2c2ff',
+      ].map((hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+      // The ink-* steps (ink at 80, 70, 50, 40, 30, 20, 10 and 5%) in either theme.
+      const steps = [0.8, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05];
+      const inks = [solids[0], solids[1]];
+      const same = (a: number[], b: number[]) => a.every((c, i) => Math.abs(c - b[i]) <= 1);
+      const allowed = (value: string) => {
+        const parts = value.match(/[\d.]+/g)?.map(Number);
+        if (!parts) return true;
+        const [rgb, alpha] = [parts.slice(0, 3), parts[3] ?? 1];
+        if (alpha === 0) return true;
+        if (alpha === 1) return solids.some((solid) => same(solid, rgb));
+        return (
+          inks.some((ink) => same(ink, rgb)) &&
+          steps.some((step) => Math.abs(step - alpha) < 0.01)
+        );
+      };
+      const found = new Set<string>();
+      for (const element of document.querySelectorAll('body *')) {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        if (!box.width || !box.height || style.visibility === 'hidden') continue;
+        const label = `${element.tagName.toLowerCase()}.${String(element.getAttribute('class') ?? '').split(' ')[0]}`;
+        const hasText = [...element.childNodes].some(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent!.trim(),
+        );
+        const colours: [string, string][] = [['background', style.backgroundColor]];
+        if (hasText || element.tagName === 'svg') colours.push(['text', style.color]);
+        for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const)
+          if (parseFloat(style[`border${side}Width`]) > 0)
+            colours.push(['border', style[`border${side}Color`]]);
+        for (const [kind, value] of colours)
+          if (!allowed(value)) found.add(`${kind} ${value} on ${label}`);
+      }
+      return [...found];
+    });
+    expect(offGuide).toEqual([]);
+  });
+}
+
+test('opens the existing-signer fields when an approval link carries the agent', async ({
+  page,
+}) => {
+  await fixture(page, { noDefaultAgent: true });
+  await page.goto(`/?agent=${agent}&amount=0.02`);
+  await page.getByRole('link', { name: '2. Configure signer', exact: true }).click();
+  const field = page.getByLabel('Agent signer', { exact: true });
+  await expect(field).toBeVisible();
+  await expect(field).toHaveValue(agent);
+  const toggle = page.getByText('Already have a signer?', { exact: true });
+  await toggle.click();
+  await expect(field).toBeHidden();
+  await toggle.click();
+  await expect(field).toHaveValue(agent);
+});
+
+test('waits for a pasted signer’s checks, then moves once to the right step', async ({ page }) => {
+  await fixture(page, { noDefaultAgent: true, allowance: 10n ** 6n });
+  let slowReads = false;
+  await page.route(`${rpcUrl}/`, async (route) => {
+    if (slowReads) await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  // Record every step that opens after the address is pasted.
+  await page.evaluate(() => {
+    const opened: string[] = ((window as any).openedSteps = []);
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const card = record.target as HTMLElement;
+        if (card.dataset.state === 'open') opened.push(card.id);
+      }
+    }).observe(document.querySelector('.walkthrough')!, {
+      subtree: true,
+      attributeFilter: ['data-state'],
+    });
+  });
+  await page.getByText('Already have a signer?', { exact: true }).click();
+  slowReads = true;
+  await page.getByLabel('Agent signer', { exact: true }).fill(agent);
+  await expect(page.locator('#agent-help')).toHaveText("Checking this signer's allowance and gas…");
+  await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  // The owner already approved this signer and it has no gas, so the walkthrough goes to step 4.
+  await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
+  await expect(page.locator('#agent-help')).toHaveText(
+    'The 0x… address only. Never paste a private key.',
+  );
+  const opened = await page.evaluate(() => (window as any).openedSteps as string[]);
+  expect(opened.filter((id) => /^step-\d$/.test(id))).toEqual(['step-4']);
+});
+
+test('suggests a chat request that fits the remaining allowance and copies it', async ({
+  page,
+  context,
+}) => {
+  await fixture(page, { allowance: 5_000n });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  // Approved but unfunded: the walkthrough settles on step 4 before the visitor looks ahead.
+  await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
+  await page.getByRole('link', { name: '5. Send payment', exact: true }).click();
+  const step5 = page.getByRole('region', { name: 'Send payment', exact: true });
+  // Only 0.005 USDT0 is approved, so the example asks for that, not 0.01.
+  await expect(step5.locator('.ask-agent code')).toHaveText('Send 0.005 USDT0 to 0x…');
+  await step5.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(step5.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Send 0.005 USDT0 to 0x…',
+  );
 });
