@@ -15,17 +15,18 @@
   --color-card: var(--surface);
   --color-card-foreground: var(--ink);
   --color-primary: var(--accent);
-  --color-primary-foreground: var(--ink-inverse);
+  --color-primary-foreground: var(--on-accent);
   --color-secondary: var(--ink-05);
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--ink-05);
   --color-muted-foreground: var(--ink-70);
   --color-accent: var(--ink-05);
   --color-accent-foreground: var(--ink);
-  --color-destructive: var(--danger);
+  --color-destructive: var(--danger-text);
   --color-border: var(--ink-10);
   --color-input: var(--ink-10);
-  --color-ring: var(--accent);
+  --color-ring: var(--signal);
+  --color-signal: var(--signal);
   --radius-sm: 0;
   --radius-md: 0;
   --radius-lg: 0;
@@ -51,6 +52,14 @@
   --accent: #84ff82;
   --accent-soft: #e1ffcd;
   --danger: #ff8991;
+  /* Accent as text, rings and strokes; --accent stays the fill. Same green on dark. */
+  --signal: #84ff82;
+  --on-accent: #001e1e;
+  --danger-text: #ff8991;
+  --wipe: #e8fbf7;
+  --on-wipe: #001e1e;
+  --header-bg: rgb(0 30 30 / 0.8);
+  --toast-neutral: #e8fbf7;
   --font-heading: 'Aeonik', 'DM Sans', sans-serif;
   --font-body: 'Work Sans', sans-serif;
   --font-code: 'IBM Plex Mono', monospace;
@@ -65,6 +74,32 @@
   background: var(--surface);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+}
+/* Light theme: the design system's inverted panel (surface-inverse ground, ink-inverse text)
+   used as the page, with only design-system colours. The guide never puts accent or danger
+   on this ground, so light fills carry dark text: accent stays a fill (buttons, current step)
+   and errors sit on a danger fill. The ink steps keep the guide's alphas, except ink-50,
+   which would be 3.32:1 here (under the guide's 4.5:1 floor for text) and uses ink-70's. */
+:root[data-theme='light'] {
+  --surface: #e8fbf7;
+  --surface-inverse: #001e1e;
+  --ink: #001e1e;
+  --ink-inverse: #e8fbf7;
+  --ink-80: #001e1ecc;
+  --ink-70: #001e1eb3;
+  --ink-50: #001e1eb3;
+  --ink-40: #001e1e66;
+  --ink-30: #001e1e4d;
+  --ink-20: #001e1e33;
+  --ink-10: #001e1e1a;
+  --ink-05: #001e1e0d;
+  --signal: #001e1e;
+  --danger-text: #001e1e;
+  --wipe: #001e1e;
+  --on-wipe: #e8fbf7;
+  --header-bg: rgb(232 251 247 / 0.8);
+  --toast-neutral: #e8fbf7;
+  color-scheme: light;
 }
 /* Element defaults live in the base layer so component utility classes still apply. */
 @layer base {
@@ -83,7 +118,7 @@
   }
   ::selection {
     background: var(--accent);
-    color: var(--ink-inverse);
+    color: var(--on-accent);
   }
   button,
   [role='button'],
@@ -97,13 +132,13 @@
     transition: color 0.2s;
   }
   a:hover {
-    color: var(--accent);
+    color: var(--signal);
     text-decoration-color: currentColor;
   }
   a:focus-visible,
   summary:focus-visible,
   button:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--signal);
     outline-offset: 2px;
   }
   strong {
@@ -147,7 +182,7 @@
   line-height: 1.4;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--signal);
   margin: 0 0 16px;
 }
 
@@ -159,7 +194,7 @@ a[data-slot='button'] {
   letter-spacing: 0.02em;
   cursor: pointer;
   /* The Stable wipe: an inverse panel slides in from the left under the label. */
-  background-image: linear-gradient(var(--surface-inverse), var(--surface-inverse));
+  background-image: linear-gradient(var(--wipe), var(--wipe));
   background-repeat: no-repeat;
   background-size: 0% 100%;
   transition:
@@ -182,7 +217,7 @@ a[data-slot='button'] {
   [data-slot='button']:is([data-variant='default'], [data-variant='outline']):not(:disabled):hover {
     background-size: 100% 100%;
     border-color: var(--ink);
-    color: var(--ink-inverse);
+    color: var(--on-wipe);
   }
 }
 button[data-slot='button']:disabled {
@@ -242,7 +277,7 @@ textarea[data-slot='textarea'] {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgb(0 30 30 / 0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ink-10);
@@ -287,10 +322,25 @@ html {
   text-decoration: none;
 }
 .header-links a:hover {
-  color: var(--accent);
+  color: var(--signal);
 }
 .header-links a:focus-visible,
 .brand:focus-visible {
+  outline-offset: -2px;
+}
+button[data-slot='button'].theme-toggle {
+  height: auto;
+  min-height: 0;
+  width: var(--nav-height);
+  padding: 0;
+  color: var(--ink-70);
+}
+@media (hover: hover) {
+  button[data-slot='button'].theme-toggle:hover {
+    color: var(--signal);
+  }
+}
+button[data-slot='button'].theme-toggle:focus-visible {
   outline-offset: -2px;
 }
 button[data-slot='button'].network-button {
@@ -299,7 +349,7 @@ button[data-slot='button'].network-button {
   padding: 0 24px;
   border: 0;
   border-left: 1px solid var(--ink-10);
-  color: var(--accent);
+  color: var(--ink);
 }
 button[data-slot='button'].network-button:focus-visible {
   outline-offset: -2px;
@@ -361,7 +411,7 @@ button[data-slot='button'].network-button:focus-visible {
   flex-shrink: 0;
 }
 .status-dot.online {
-  background: var(--accent);
+  background: var(--signal);
 }
 .address {
   font-family: var(--font-code);
@@ -449,7 +499,7 @@ button[data-slot='button'].network-button:focus-visible {
 }
 .journey-nav a > svg {
   margin-left: auto;
-  color: var(--accent);
+  color: var(--signal);
 }
 .journey-nav a:focus-visible {
   outline-offset: -2px;
@@ -466,15 +516,15 @@ button[data-slot='button'].network-button:focus-visible {
   color: var(--ink-70);
 }
 .nav-number svg {
-  color: var(--accent);
+  color: var(--signal);
 }
 .journey-nav a[aria-current='step'] .nav-number {
   background: var(--accent);
-  border-color: var(--accent);
-  color: var(--ink-inverse);
+  border-color: var(--signal);
+  color: var(--on-accent);
 }
 .journey-nav a[aria-current='step'] .nav-number svg {
-  color: var(--ink-inverse);
+  color: var(--on-accent);
 }
 .resource-links {
   list-style: none;
@@ -497,7 +547,7 @@ button[data-slot='button'].network-button:focus-visible {
 }
 .resource-links a:hover,
 .cli-panel summary:hover {
-  color: var(--accent);
+  color: var(--signal);
 }
 .resource-links a:focus-visible,
 .cli-panel summary:focus-visible {
@@ -579,7 +629,7 @@ h1 {
   margin: 0 0 28px;
   text-wrap: balance;
 }
-.intro p:not(.eyebrow) {
+.intro p {
   max-width: 64ch;
 }
 .intro .lede {
@@ -622,8 +672,19 @@ h1 {
 }
 .message.error,
 .message.error [data-slot='alert-description'] {
-  color: var(--danger);
+  color: var(--danger-text);
   background: transparent;
+}
+/* Light theme: danger cannot be text on the light ground, so errors sit on a danger fill
+   with dark text (7.67:1), as the design system's error toast does. */
+:root[data-theme='light'] .message.error,
+:root[data-theme='light'] .step-status .step-status-error,
+:root[data-theme='light'] .field-error {
+  background: var(--danger);
+}
+:root[data-theme='light'] .step-status .step-status-error,
+:root[data-theme='light'] .field-error {
+  padding: 8px 12px;
 }
 .message button {
   margin-top: 12px;
@@ -655,7 +716,7 @@ h1 {
   margin-top: 6px;
 }
 .step-status .step-status-error {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 .step-status [data-slot='button'] {
   margin-top: 6px;
@@ -689,7 +750,7 @@ h1 {
   font-family: var(--font-body);
 }
 .step-trigger:hover .step-title {
-  color: var(--accent);
+  color: var(--signal);
 }
 .step-trigger > svg {
   color: var(--ink-50);
@@ -707,7 +768,7 @@ h1 {
   color: var(--ink-70);
 }
 .step-number svg {
-  color: var(--accent);
+  color: var(--signal);
 }
 .step-card[data-state='open'] .step-number {
   border-color: var(--ink-50);
@@ -715,11 +776,11 @@ h1 {
 }
 .step-card[data-current='true'] .step-number {
   background: var(--accent);
-  border-color: var(--accent);
-  color: var(--ink-inverse);
+  border-color: var(--signal);
+  color: var(--on-accent);
 }
 .step-card[data-current='true'] .step-number svg {
-  color: var(--ink-inverse);
+  color: var(--on-accent);
 }
 .complete-badge {
   color: var(--ink-70);
@@ -766,9 +827,51 @@ h1 {
   line-height: 1.65;
   margin: 12px 0 18px;
 }
+/* Step 5's example request: what to type to the agent, with a copy button. */
+.ask-agent {
+  display: flex;
+  align-items: stretch;
+  margin: 4px 0 12px;
+  border: 1px solid var(--ink-10);
+  background: var(--ink-05);
+}
+.ask-agent code {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  font-family: var(--font-code);
+  font-size: 14px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ask-agent [data-slot='button'] {
+  height: auto;
+  border-width: 0 0 0 1px;
+}
+/* A small spinner beside a note while the page reads the chain. */
+.form-note.checking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.form-note.checking::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border: 2px solid var(--ink-20);
+  border-top-color: var(--signal);
+  border-radius: 9999px;
+  animation: toast-spin 1s linear infinite;
+}
+/* Step changes cross-fade (see the currentStep effect in App.tsx); keep it brief. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+}
 .field-error {
   font-size: 14px;
-  color: var(--danger);
+  color: var(--danger-text);
   margin: 8px 0 18px;
 }
 .field-error:empty {
@@ -798,7 +901,7 @@ h1 {
 }
 .actions > a:hover,
 .handoff-state > a:hover {
-  color: var(--accent);
+  color: var(--signal);
 }
 .actions button {
   flex-shrink: 0;
@@ -828,28 +931,19 @@ h1 {
   color: var(--ink-70);
   font-size: 14px;
 }
-.field-divider {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 32px 0 0;
-  font-family: var(--font-code);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-50);
-}
-.field-divider:before,
-.field-divider:after {
-  content: '';
-  height: 1px;
-  background: var(--ink-10);
-  flex: 1;
-}
 .setup-prompt {
   margin-top: 16px;
 }
-.setup-prompt summary {
+/* The existing-signer fields and the full payment prompt fold under a hairline. */
+:is(.signer-details, .payment-details) {
+  margin-top: 32px;
+  border-top: 1px solid var(--ink-10);
+  padding-top: 8px;
+}
+:is(.signer-details, .payment-details)[open] {
+  padding-bottom: 8px;
+}
+:is(.setup-prompt, .signer-details, .payment-details) summary {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -859,19 +953,25 @@ h1 {
   text-transform: uppercase;
   color: var(--ink-70);
 }
-.setup-prompt summary:hover {
-  color: var(--accent);
+:is(.setup-prompt, .signer-details, .payment-details) summary:hover {
+  color: var(--signal);
 }
-.setup-prompt summary::-webkit-details-marker {
+:is(.setup-prompt, .signer-details, .payment-details) summary::-webkit-details-marker {
   display: none;
 }
-.setup-prompt summary::after {
+:is(.setup-prompt, .signer-details, .payment-details) summary::after {
   content: '+';
   margin-left: 10px;
   font-size: 14px;
 }
-.setup-prompt[open] summary::after {
+:is(.setup-prompt, .signer-details, .payment-details)[open] summary::after {
   content: '−';
+}
+:is(.signer-details, .payment-details) summary {
+  font-weight: 500;
+}
+:is(.signer-details, .payment-details)[open] summary {
+  margin-bottom: 8px;
 }
 .review-grid {
   display: grid;
@@ -967,7 +1067,7 @@ h1 {
   text-decoration: none;
 }
 .site-footer a:hover {
-  color: var(--accent);
+  color: var(--signal);
 }
 
 /* ----------------------------------------------------------------- Toast */
@@ -979,19 +1079,23 @@ h1 {
   width: 360px;
   max-width: calc(100vw - 2 * var(--gutter));
   padding: var(--gutter);
-  color: var(--ink-inverse);
+  color: var(--on-accent);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 .toast-pending {
-  background: var(--surface-inverse);
+  background: var(--toast-neutral);
 }
 .toast-added {
   background: var(--accent);
 }
 .toast-failed {
   background: var(--danger);
+}
+/* The loading toast's surface-inverse fill is the light page itself; the hairline separates it. */
+:root[data-theme='light'] .toast-pending {
+  border: 1px solid var(--ink-10);
 }
 .toast-head {
   display: flex;
@@ -1010,7 +1114,7 @@ h1 {
   margin: 12px 0 0;
   font-size: 14px;
   line-height: 1.6;
-  color: rgb(0 30 30 / 0.85);
+  color: rgb(0 30 30 / 0.8);
   overflow-wrap: anywhere;
 }
 .toast-close,
@@ -1020,7 +1124,7 @@ h1 {
   justify-content: center;
   border: 1px solid rgb(0 30 30 / 0.3);
   background: transparent;
-  color: var(--ink-inverse);
+  color: var(--on-accent);
   cursor: pointer;
 }
 .toast-close {
@@ -1042,14 +1146,14 @@ h1 {
   background: rgb(0 30 30 / 0.1);
 }
 .toast :focus-visible {
-  outline-color: var(--ink-inverse);
+  outline-color: var(--on-accent);
 }
 .toast-spinner {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
   border: 2px solid rgb(0 30 30 / 0.3);
-  border-top-color: var(--ink-inverse);
+  border-top-color: var(--on-accent);
   border-radius: 9999px;
   animation: toast-spin 1s linear infinite;
 }
@@ -1123,8 +1227,9 @@ h1 {
     height: var(--nav-height);
     padding: 0 12px;
   }
-  .header-links a:last-child {
-    padding-right: var(--gutter);
+  button[data-slot='button'].theme-toggle {
+    height: var(--nav-height);
+    margin-right: 8px;
   }
   button[data-slot='button'].network-button {
     flex-basis: 100%;

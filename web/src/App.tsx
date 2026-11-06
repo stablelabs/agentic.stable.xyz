@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { BaseError, createWalletClient, custom, formatUnits, type Address } from 'viem';
 import {
   address,
@@ -25,6 +26,8 @@ import {
   ChevronRight,
   ChevronDown,
   X,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -134,6 +137,11 @@ function wasDisconnected() {
     return false;
   }
 }
+// Dark is the Stable default; a saved choice is applied before first paint by index.html.
+const THEME_KEY = 'agentic-stable-demo:theme';
+type Theme = 'dark' | 'light';
+const pageTheme = (): Theme =>
+  document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 const formatBalance = (value: bigint) =>
   new Intl.NumberFormat('en', { maximumFractionDigits: 6 }).format(Number(formatAmount(value)));
 type NetworkRequest =
@@ -149,6 +157,11 @@ export default function App() {
   const [provider, setProvider] = useState<Provider>();
   const [account, setAccount] = useState<Address>();
   const [agent, setAgent] = useState('');
+  // The existing-signer fields stay folded until a visitor asks for them or an address arrives.
+  const [signerOpen, setSignerOpen] = useState(false);
+  useEffect(() => {
+    if (agent.trim()) setSignerOpen(true);
+  }, [agent]);
   const [amount, setAmount] = useState(
     new URLSearchParams(location.search).get('amount') || '0.01',
   );
@@ -172,6 +185,23 @@ export default function App() {
   const [openSteps, setOpenSteps] = useState<string[]>(['1']);
   const [selectedStep, setSelectedStep] = useState(1);
   const [networkRequest, setNetworkRequest] = useState<NetworkRequest>({ state: 'idle' });
+  const [theme, setTheme] = useState<Theme>(pageTheme);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'light' ? '#e8fbf7' : '#001e1e');
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', theme);
+  }, [theme]);
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* Storage blocked: the theme still applies for this visit. */
+    }
+  }
   const networkRequestId = useRef(0);
   const addNetworkInFlight = useRef<Promise<void> | undefined>(undefined);
   const networkButton = useRef<HTMLButtonElement>(null);
@@ -204,28 +234,50 @@ export default function App() {
   } catch {
     gasError = 'Enter a positive amount with at most 6 fractional digits.';
   }
-  const currentStep = !connected
-    ? 1
-    : !selectedAgent
-      ? 2
-      : allowance === undefined || allowance === 0n
-        ? 3
-        : gasBalance === undefined || gasBalance === 0n
-          ? 4
-          : 5;
+  // While a new signer's allowance and gas are loading, the walkthrough stays on the step the
+  // visitor is on and moves once to the right step, instead of stepping through 3, 4 and 5.
+  const checkingAgent =
+    connected &&
+    !!selectedAgent &&
+    !networkError &&
+    (allowance === undefined || gasBalance === undefined);
+  const heldStep = useRef(1);
+  const currentStep = checkingAgent
+    ? heldStep.current
+    : !connected
+      ? 1
+      : !selectedAgent
+        ? 2
+        : allowance === undefined || allowance === 0n
+          ? 3
+          : gasBalance === undefined || gasBalance === 0n
+            ? 4
+            : 5;
+  heldStep.current = currentStep;
   const allSteps = openSteps.length === 5;
   useEffect(() => {
-    const moveFocus = !!document.activeElement?.closest('.step-card');
-    setSelectedStep(currentStep);
-    setOpenSteps((previous) => (previous.length === 5 ? previous : [String(currentStep)]));
-    if (!allSteps && moveFocus) {
-      const frame = requestAnimationFrame(() =>
-        document
-          .querySelector<HTMLButtonElement>(`#step-${currentStep} [data-slot=accordion-trigger]`)
-          ?.focus({ preventScroll: true }),
-      );
-      return () => cancelAnimationFrame(frame);
-    }
+    const following = !!document.activeElement?.closest('.step-card');
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const apply = () => {
+      flushSync(() => {
+        setSelectedStep(currentStep);
+        setOpenSteps((previous) => (previous.length === 5 ? previous : [String(currentStep)]));
+      });
+      if (allSteps || !following) return;
+      const card = document.getElementById(`step-${currentStep}`);
+      // Bring the new step into view when the old one collapsed out from under the visitor.
+      const top = card?.getBoundingClientRect().top ?? 0;
+      const headerBottom = document.querySelector('.site-header')?.getBoundingClientRect().bottom ?? 0;
+      if (card && (top < headerBottom || top > innerHeight - 160))
+        card.scrollIntoView({ block: 'start' });
+      card
+        ?.querySelector<HTMLButtonElement>('[data-slot=accordion-trigger]')
+        ?.focus({ preventScroll: true });
+    };
+    // Cross-fade the step change where the browser supports it, so it doesn't snap.
+    if (following && !allSteps && !reduceMotion && document.startViewTransition)
+      document.startViewTransition(apply);
+    else apply();
   }, [currentStep]);
   const walletBlocked =
     !connected || !verified || !!networkError || !storageReady || busy || pending;
@@ -697,7 +749,12 @@ Tell me if your storage might not persist between sessions. Stop before making a
       <header className="site-header">
         <div className="nav-row">
           <a className="brand" href={MAIN_SITE_URL}>
-            <img src="/brand/stable-wordmark-light.svg" alt="Stable" width={93} height={24} />
+            <img
+              src={`/brand/stable-wordmark-${theme === 'light' ? 'dark' : 'light'}.svg`}
+              alt="Stable"
+              width={93}
+              height={24}
+            />
           </a>
           <nav className="header-links" aria-label="Resources">
             <a href={GITHUB_URL} target="_blank" rel="noreferrer">
@@ -707,6 +764,19 @@ Tell me if your storage might not persist between sessions. Stop before making a
               Docs <ArrowUpRight size={14} aria-hidden="true" />
             </a>
           </nav>
+          <Button
+            variant="ghost"
+            className="theme-toggle"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? (
+              <Sun size={16} aria-hidden="true" />
+            ) : (
+              <Moon size={16} aria-hidden="true" />
+            )}
+          </Button>
           <Button
             ref={networkButton}
             variant="outline"
@@ -724,24 +794,16 @@ Tell me if your storage might not persist between sessions. Stop before making a
       </header>
       <div className="demo-layout">
         <section className="intro" aria-labelledby="intro-title">
-          <p className="eyebrow">Stable Testnet demo</p>
           <h1 id="intro-title">Agent payments</h1>
           <p className="lede">
-            This demo lets an AI agent pay in USDT0 on Stable Testnet. You connect MetaMask,
-            give an agent a USDT0 allowance, fund its gas, then hand off a test payment for the
-            agent to send.
+            Connect MetaMask, give an AI agent a USDT0 allowance, fund its gas, and let it send
+            a test payment.
           </p>
           <p>
-            The payment is an ERC-20 <code>transferFrom</code> from your wallet, capped by the
-            allowance, so your USDT0 stays with you until the agent pays. The agent signs with
-            the agent-wallet CLI and keeps its key on its own machine. Approval and gas funding
-            are separate MetaMask transactions. This page never sends the payment; the agent
-            does, and returns a receipt you can check on StableScan.
+            Your USDT0 stays in your wallet until the agent pays, and it can spend only up to
+            the allowance.
           </p>
-          <p className="intro-needs">
-            You need MetaMask, test USDT0 and an agent that can run Node.js 22+ with persistent
-            storage.
-          </p>
+          <p className="intro-needs">You need MetaMask, test USDT0 and an agent with Node.js 22+.</p>
           <div className="intro-actions">
             <Button asChild variant="outline">
               <a href={FAUCET_URL} target="_blank" rel="noreferrer">
@@ -1075,43 +1137,63 @@ Tell me if your storage might not persist between sessions. Stop before making a
                     />
                   </details>
                 )}
-                <div className="field-divider">
-                  <span>Existing signer</span>
-                </div>
-                <label htmlFor="agent-signer">Agent signer</label>
-                <Input
-                  id="agent-signer"
-                  aria-label="Agent signer"
-                  value={agent}
-                  onChange={(e) => {
-                    setAgent(e.target.value);
-                    setAllowance(undefined);
-                    setGasBalance(undefined);
-                  }}
-                  disabled={busy || pending}
-                  placeholder="0x…"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={!!agentError}
-                  aria-describedby="agent-help"
-                />
-                <p id="agent-help" className={agentError ? 'field-error' : 'form-note'}>
-                  {agentError || 'Signer address only. Keep the private key local.'}
-                </p>
-                <Button
-                  variant="outline"
-                  disabled={!connected || busy || !!agentError}
-                  onClick={() => {
-                    try {
-                      downloadConfig();
-                    } catch (e) {
-                      setError(failure(e));
-                    }
-                  }}
+                <details
+                  className="signer-details"
+                  open={signerOpen}
+                  onToggle={(event) => setSignerOpen(event.currentTarget.open)}
                 >
-                  Download wallet settings
-                </Button>
-                <p className="form-note">Public owner, token, RPC and signer settings.</p>
+                  <summary>Already have a signer?</summary>
+                  <p className="form-note">
+                    Skip the prompt if your agent already has a signer, or if its approval link
+                    didn't open. Paste the signer address your agent gave you.
+                  </p>
+                  <label htmlFor="agent-signer">Agent signer</label>
+                  <Input
+                    id="agent-signer"
+                    aria-label="Agent signer"
+                    value={agent}
+                    onChange={(e) => {
+                      setAgent(e.target.value);
+                      setAllowance(undefined);
+                      setGasBalance(undefined);
+                    }}
+                    disabled={busy || pending}
+                    placeholder="0x…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={!!agentError}
+                    aria-describedby="agent-help"
+                  />
+                  <p
+                    id="agent-help"
+                    className={
+                      agentError ? 'field-error' : checkingAgent ? 'form-note checking' : 'form-note'
+                    }
+                    aria-live="polite"
+                  >
+                    {agentError ||
+                      (checkingAgent
+                        ? "Checking this signer's allowance and gas…"
+                        : 'The 0x… address only. Never paste a private key.')}
+                  </p>
+                  <Button
+                    variant="outline"
+                    disabled={!connected || busy || !!agentError}
+                    onClick={() => {
+                      try {
+                        downloadConfig();
+                      } catch (e) {
+                        setError(failure(e));
+                      }
+                    }}
+                  >
+                    Download wallet settings
+                  </Button>
+                  <p className="form-note">
+                    A file your agent can import instead of using the prompt. It holds only public
+                    addresses and network details, no keys.
+                  </p>
+                </details>
               </section>
             </Step>
             <Step
@@ -1276,7 +1358,7 @@ Tell me if your storage might not persist between sessions. Stop before making a
               number={5}
               current={selectedStep === 5}
               title="Send payment"
-              summary="Agent-signed transferFrom"
+              summary="Ask your agent"
             >
               <PaymentStep
                 config={connected ? config : undefined}

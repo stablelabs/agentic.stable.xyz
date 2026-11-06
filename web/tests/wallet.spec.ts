@@ -657,6 +657,7 @@ test('copies an exact payment request after approval and gas funding without sen
   await connect(page);
   const payment = page.getByRole('region', { name: 'Send payment', exact: true });
   const recipient = '0x4444444444444444444444444444444444444444';
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await page.getByLabel('Recipient address', { exact: true }).fill(recipient);
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
   await expect(copy).toBeDisabled();
@@ -713,6 +714,7 @@ test('validates payment terms and provides manual copying if clipboard access is
   const recipient = page.getByLabel('Recipient address', { exact: true });
   const amount = page.getByLabel('Payment amount (USDT0)');
   const copy = page.getByRole('button', { name: 'Copy payment prompt', exact: true });
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await recipient.fill('0x0000000000000000000000000000000000000000');
   await expect(copy).toBeDisabled();
   await expect(recipient).toHaveAttribute('aria-invalid', 'true');
@@ -852,6 +854,9 @@ test('guides a new visitor through five steps and ends with an honest payment ha
     'step',
   );
   await page.getByLabel('Allowance amount (USDT0)').fill('0.01');
+  // The existing-signer fields start folded for a new visitor.
+  await expect(page.getByLabel('Agent signer', { exact: true })).toBeHidden();
+  await page.getByText('Already have a signer?', { exact: true }).click();
   await page.getByLabel('Agent signer', { exact: true }).fill(agent);
   await expect(page.locator('#step-3')).toHaveAttribute('data-state', 'open');
   await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
@@ -862,6 +867,12 @@ test('guides a new visitor through five steps and ends with an honest payment ha
     'aria-current',
     'step',
   );
+  // Asking the agent in chat is the main path; the full prompt builder is folded.
+  const step5 = page.getByRole('region', { name: 'Send payment', exact: true });
+  await expect(step5.locator('.ask-agent code')).toHaveText('Send 0.01 USDT0 to 0x…');
+  await expect(step5).toContainText('It can spend up to');
+  await expect(page.getByLabel('Recipient address', { exact: true })).toBeHidden();
+  await page.getByText('New chat or different agent?', { exact: true }).click();
   await page.getByLabel('Recipient address', { exact: true }).fill(other);
   await page.getByRole('button', { name: 'Copy payment prompt', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Submit via agent' })).toBeVisible();
@@ -1353,4 +1364,227 @@ test('stays disconnected after Disconnect until the visitor connects again', asy
   await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Owner connected', exact: true })).toBeVisible();
+});
+
+test('switches between dark and light themes and remembers the choice', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/');
+  const html = page.locator('html');
+  const logo = page.getByRole('banner').getByRole('img', { name: 'Stable' });
+  const background = () =>
+    page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  expect(await background()).toBe('rgb(0, 30, 30)');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-light.svg');
+  await page.getByRole('button', { name: 'Switch to light theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  expect(await background()).toBe('rgb(232, 251, 247)');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-dark.svg');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#e8fbf7');
+  // The saved theme is applied before the app renders, so a reload does not flash dark.
+  await page.reload({ waitUntil: 'commit' });
+  await page.waitForFunction(() => document.body !== null);
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(logo).toHaveAttribute('src', '/brand/stable-wordmark-light.svg');
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`keeps text at 4.5:1 or better in the ${theme} theme`, async ({ page }) => {
+    await fixture(page, { noDefaultAgent: true });
+    await page.addInitScript(
+      (value) => localStorage.setItem('agentic-stable-demo:theme', value),
+      theme,
+    );
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+    await page.getByText('Already have a signer?', { exact: true }).click();
+    await page.getByLabel('Agent signer', { exact: true }).fill('0x2');
+    const ratios = await page.evaluate(() => {
+      const parse = (value: string) => {
+        const parts = value.match(/[\d.]+/g)!.map(Number);
+        return { rgb: parts.slice(0, 3), alpha: parts[3] ?? 1 };
+      };
+      const lum = ([r, g, b]: number[]) => {
+        const f = (c: number) => {
+          const v = c / 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const backgroundOf = (element: Element | null): number[] => {
+        for (let node = element; node; node = node.parentElement) {
+          const { rgb, alpha } = parse(getComputedStyle(node).backgroundColor);
+          if (alpha === 1 && getComputedStyle(node).backgroundImage === 'none') return rgb;
+        }
+        return parse(getComputedStyle(document.body).backgroundColor).rgb;
+      };
+      const ratio = (selector: string) => {
+        const element = document.querySelector(selector)!;
+        const ground = backgroundOf(element);
+        const { rgb, alpha } = parse(getComputedStyle(element).color);
+        const text = rgb.map((c, i) => alpha * c + (1 - alpha) * ground[i]);
+        const [a, b] = [lum(text), lum(ground)];
+        return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100;
+      };
+      return Object.fromEntries(
+        [
+          '.walkthrough-toolbar .eyebrow',
+          '.intro .lede',
+          '.intro-needs',
+          '.account-meta',
+          '.balance-unit',
+          '.step-summary',
+          '.form-note',
+          '#agent-help',
+          '.network-button',
+          '.site-footer p',
+          '.wallet-actions [data-variant="ghost"]',
+        ].map((selector) => [selector, ratio(selector)]),
+      );
+    });
+    for (const [selector, value] of Object.entries(ratios))
+      expect(value, `${selector} in ${theme}`).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test(`uses only Stable design system colours in the ${theme} theme`, async ({ page }) => {
+    await fixture(page, { noDefaultAgent: true });
+    await page.addInitScript(
+      (value) => localStorage.setItem('agentic-stable-demo:theme', value),
+      theme,
+    );
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+    // An invalid agent puts an error on screen, so error colours are checked too.
+    await page.getByText('Already have a signer?', { exact: true }).click();
+    await page.getByLabel('Agent signer', { exact: true }).fill('0x2');
+    await expect(page.locator('#agent-help.field-error')).toBeVisible();
+    await page.mouse.move(0, 0);
+    const offGuide = await page.evaluate(() => {
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        '<style>*, *::before, *::after { transition: none !important; }</style>',
+      );
+      // Solid colours from the design system's tokens.json.
+      const solids = [
+        '#001e1e', '#e8fbf7', '#84ff82', '#e1ffcd', '#6df5ff', '#ff8991', '#b4ff82',
+        '#9abbb4', '#b8fbf7', '#5c7f7a', '#001a1c', '#a7f9ff', '#0c1e00', '#1f1b00',
+        '#ffe96d', '#fff5bc', '#280003', '#ffd4d7', '#080020', '#a889ff', '#d2c2ff',
+      ].map((hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+      // The ink-* steps (ink at 80, 70, 50, 40, 30, 20, 10 and 5%) in either theme.
+      const steps = [0.8, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05];
+      const inks = [solids[0], solids[1]];
+      const same = (a: number[], b: number[]) => a.every((c, i) => Math.abs(c - b[i]) <= 1);
+      const allowed = (value: string) => {
+        const parts = value.match(/[\d.]+/g)?.map(Number);
+        if (!parts) return true;
+        const [rgb, alpha] = [parts.slice(0, 3), parts[3] ?? 1];
+        if (alpha === 0) return true;
+        if (alpha === 1) return solids.some((solid) => same(solid, rgb));
+        return (
+          inks.some((ink) => same(ink, rgb)) &&
+          steps.some((step) => Math.abs(step - alpha) < 0.01)
+        );
+      };
+      const found = new Set<string>();
+      for (const element of document.querySelectorAll('body *')) {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        if (!box.width || !box.height || style.visibility === 'hidden') continue;
+        const label = `${element.tagName.toLowerCase()}.${String(element.getAttribute('class') ?? '').split(' ')[0]}`;
+        const hasText = [...element.childNodes].some(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent!.trim(),
+        );
+        const colours: [string, string][] = [['background', style.backgroundColor]];
+        if (hasText || element.tagName === 'svg') colours.push(['text', style.color]);
+        for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const)
+          if (parseFloat(style[`border${side}Width`]) > 0)
+            colours.push(['border', style[`border${side}Color`]]);
+        for (const [kind, value] of colours)
+          if (!allowed(value)) found.add(`${kind} ${value} on ${label}`);
+      }
+      return [...found];
+    });
+    expect(offGuide).toEqual([]);
+  });
+}
+
+test('opens the existing-signer fields when an approval link carries the agent', async ({
+  page,
+}) => {
+  await fixture(page, { noDefaultAgent: true });
+  await page.goto(`/?agent=${agent}&amount=0.02`);
+  await page.getByRole('link', { name: '2. Configure signer', exact: true }).click();
+  const field = page.getByLabel('Agent signer', { exact: true });
+  await expect(field).toBeVisible();
+  await expect(field).toHaveValue(agent);
+  const toggle = page.getByText('Already have a signer?', { exact: true });
+  await toggle.click();
+  await expect(field).toBeHidden();
+  await toggle.click();
+  await expect(field).toHaveValue(agent);
+});
+
+test('waits for a pasted signer’s checks, then moves once to the right step', async ({ page }) => {
+  await fixture(page, { noDefaultAgent: true, allowance: 10n ** 6n });
+  let slowReads = false;
+  await page.route(`${rpcUrl}/`, async (route) => {
+    if (slowReads) await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  // Record every step that opens after the address is pasted.
+  await page.evaluate(() => {
+    const opened: string[] = ((window as any).openedSteps = []);
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const card = record.target as HTMLElement;
+        if (card.dataset.state === 'open') opened.push(card.id);
+      }
+    }).observe(document.querySelector('.walkthrough')!, {
+      subtree: true,
+      attributeFilter: ['data-state'],
+    });
+  });
+  await page.getByText('Already have a signer?', { exact: true }).click();
+  slowReads = true;
+  await page.getByLabel('Agent signer', { exact: true }).fill(agent);
+  await expect(page.locator('#agent-help')).toHaveText("Checking this signer's allowance and gas…");
+  await expect(page.locator('#step-2')).toHaveAttribute('data-state', 'open');
+  // The owner already approved this signer and it has no gas, so the walkthrough goes to step 4.
+  await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
+  await expect(page.locator('#agent-help')).toHaveText(
+    'The 0x… address only. Never paste a private key.',
+  );
+  const opened = await page.evaluate(() => (window as any).openedSteps as string[]);
+  expect(opened.filter((id) => /^step-\d$/.test(id))).toEqual(['step-4']);
+});
+
+test('suggests a chat request that fits the remaining allowance and copies it', async ({
+  page,
+  context,
+}) => {
+  await fixture(page, { allowance: 5_000n });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect MetaMask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Owner connected' })).toBeVisible();
+  // Approved but unfunded: the walkthrough settles on step 4 before the visitor looks ahead.
+  await expect(page.locator('#step-4')).toHaveAttribute('data-state', 'open');
+  await page.getByRole('link', { name: '5. Send payment', exact: true }).click();
+  const step5 = page.getByRole('region', { name: 'Send payment', exact: true });
+  // Only 0.005 USDT0 is approved, so the example asks for that, not 0.01.
+  await expect(step5.locator('.ask-agent code')).toHaveText('Send 0.005 USDT0 to 0x…');
+  await step5.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(step5.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Send 0.005 USDT0 to 0x…',
+  );
 });
